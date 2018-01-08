@@ -1,4 +1,4 @@
-# extratrees.py - Implementation of Extremely Randomized Trees
+# extratrees.py - Extremely Randomized Trees
 
 This is a Python implementation of the Extremely Randomized Trees (ExtraTrees)
 technique as proposed in the article
@@ -41,6 +41,8 @@ floats (for regression problems)
 Example:
 
 ```python
+from src.extratrees import Dataset, ExtraTree
+
 # Classification problem with three observations:
 #    (1, 0) => Class 1
 #    (1, 1) => Class 0
@@ -54,9 +56,12 @@ X = ((1, 0),
 Y = (1, 0, 2)
 
 data = Dataset(X, Y)
+tree = ExtraTree(n_min=1)
+tree.fit(data)
+tree.predict(data.attributes)
 ```
 
-See [example.py](docs/example.py) for a practical example.
+See [example.py](docs/example.py) for an applied example.
 
 ## Performance
 
