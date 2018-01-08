@@ -52,6 +52,8 @@ X = ((1, 0),
 
 # Labels for each sample
 Y = (1, 0, 2)
+
+data = Dataset(X, Y)
 ```
 
 See [example.py](docs/example.py) for a practical example.
@@ -65,16 +67,16 @@ The _n samples_ column shows how many samples were used for training, these are
 the first `n` of the original training set.
 For evaluation, all 10.000 test samples are used.
 
-Interpreter          N samples     Accuracy   Trees   Train [s]  Eval [s]
-==================   ========    ========    =====   ========   ========
-Python3.6                1000       0.639        1          9      0.010
-Python3.6                1000       0.792       10         94      0.065
-Pypy3, py3.5             1000       0.638        1          2      0.051
-Pypy3, py3.5             1000       0.773       10         17      0.123
-Pypy3, py3.5             1000       0.823      100        178      0.329
-Pypy3, py3.5            10000       0.813        1         30      0.127
-Pypy3, py3.5            10000       0.918       10        298      0.476
-Pypy3, py3.5              All       0.873        1        299      0.151
+|Interpreter   | N samples |  Accuracy | Trees  | Train [s] | Eval [s] |
+|--------------|-----------|-----------|--------|-----------|----------|
+|Python3.6     |      1000 |     0.639 |      1 |         9 |    0.010 |
+|Python3.6     |      1000 |     0.792 |     10 |        94 |    0.065 |
+|Pypy3, py3.5  |      1000 |     0.638 |      1 |         2 |    0.051 |
+|Pypy3, py3.5  |      1000 |     0.773 |     10 |        17 |    0.123 |
+|Pypy3, py3.5  |      1000 |     0.823 |    100 |       178 |    0.329 |
+|Pypy3, py3.5  |     10000 |     0.813 |      1 |        30 |    0.127 |
+|Pypy3, py3.5  |     10000 |     0.918 |     10 |       298 |    0.476 |
+|Pypy3, py3.5  |       All |     0.873 |      1 |       299 |    0.151 |
 
 To run the benchmarks, get the [MNIST-CSV dataset][pjreddie], and put the files 
 in `docs/mnist/` as `mnist_train.csv` and `mnist_test.csv`.
