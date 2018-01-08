@@ -85,11 +85,10 @@ They are not included in the repository here as I do not own them.
 
 ### Dataset reference
 
-- Spiral: `spiral`: 2-class spiral data, see [benchmark.py](./docs/benchmark.py)
-- Iris: `iris` from [`sklearn.datasets`](sklearn)
-- Digits: `digits` from [`sklearn.datasets`](sklearn)
-- Mnist: The MNIST dataset in CSV, from [pjreddie.com][pjreddie]
+Mnist: The MNIST dataset in CSV, from [pjreddie.com][pjreddie], originally by
+[LeCun et al (1998)][lecun1998]
 
+[lecun1998]: [http://yann.lecun.com/exdb/publis/pdf/lecun-98.pdf]
 [geurts2005]: http://orbi.ulg.ac.be/bitstream/2268/9357/1/geurts-mlj-advance.pdf
 [pjreddie]: (https://pjreddie.com/projects/mnist-in-csv/)
 [sklearn]: (http://scikit-learn.org/stable/modules/classes.html#module-sklearn.datasets)
