@@ -21,18 +21,23 @@ MAXENTROPY = 1e10
 Node = namedtuple('Node', ['split', 'left', 'right'])
 Dataset = namedtuple('Dataset', ['attributes', 'outputs'])
 
-Split = namedtuple('Split', ['attribute', 'cutoff'])
+Split: Tuple[int, float] = namedtuple('Split', ['attribute', 'cutoff'])
+Number = Union[float, int]
+LeafValues = Union[List[float], float]
+NodeValues = Union[Node, LeafValues]
+HardPrediction = Number
+Attributes = List[Number]
+Samples = List[Attributes]
+VoteFun = Union[Callable[[List[float]], float], Callable[[List[int]], int]]
 
 
-def _variance(values):
-    # type: (List[float]) -> float
+def _variance(values: List[float]) -> float:
     if not values:
         return -MAXENTROPY
     return float(variance(values) if len(values) > 1 else 0)
 
 
-def _entropy(values):
-    # type (List[float]) -> float
+def _entropy(values: List[int]) -> float:
     """ Shannon entropy """
     if not values:
         return -MAXENTROPY
@@ -42,8 +47,8 @@ def _entropy(values):
     return -sum([h_val*lh_val for h_val, lh_val in zip(hist, log_hist)])
 
 
-def _histogram(values, n_classes=None):
-    # type (List[int], Optional[int]) -> List[float]
+def _histogram(values: List[int],
+               n_classes: Optional[int] = None) -> List[float]:
     """
     Return the relative frequency of each int between 0 and n_classes
     Will guess `n_classes` if not specified
@@ -54,26 +59,22 @@ def _histogram(values, n_classes=None):
     return [cnt.get(v, 0)/len(values) for v in range(n_classes)]
 
 
-def _mean(values):
-    # type (List[float]) -> float
+def _mean(values: List[float]) -> float:
     """ Return the mean of `values` """
     return sum(values)/max(len(values), 1)
 
 
-def _majority(values):
-    # type (List[int]) -> int
+def _majority(values: List[int]) -> int:
     """ Return the most common value in `values` """
     return Counter(values).most_common(1)[0][0]
 
 
-def _argmax(values):
-    # type: (List[float]) -> int
+def _argmax(values: List[float]) -> int:
     """ Return the index of the largest value in `values` """
     return values.index(max(values))
 
 
-def _evaluate_rec(node, attributes):
-    # type: (Node, List[float]) -> Union[float, List[float]]
+def _evaluate_rec(node: Node, attributes: List[float]) -> LeafValues:
     """ Recursively traverse a node with `attributes` until a leaf is found"""
     if not isinstance(node, Node):
         return node
@@ -82,8 +83,7 @@ def _evaluate_rec(node, attributes):
     return _evaluate_rec(next_, attributes)
 
 
-def _pick_random_split(subset, attribute):
-    # type: (Dataset, int) -> Split
+def _pick_random_split(subset: Dataset, attribute: int) -> Split:
     """ Pick an (extremely random) split cutoff for `attribute` """
     attribute_values = [sample[attribute] for sample in
                         subset.attributes]
@@ -93,8 +93,7 @@ def _pick_random_split(subset, attribute):
     return Split(attribute, cut_point)
 
 
-def _evaluate_cond(split, attributes):
-    # type (Split, List[float]) -> bool
+def _evaluate_cond(split: Split, attributes: Attributes) -> bool:
     """ Evaluate the split condition on `attributes`
 
     Returns `True` if the split condition is true on the attributes
@@ -103,8 +102,7 @@ def _evaluate_cond(split, attributes):
     return bool(attributes[attribute] > cutoff)
 
 
-def _evaluate_split(subset, split):
-    # type: (Dataset, Split) -> Tuple[Dataset, Dataset]
+def _evaluate_split(subset: Dataset, split: Split) -> Tuple[Dataset, Dataset]:
     """" Evaluate split
 
     Returns a tuple(left, right) with `left` the samples in `subset` for
@@ -131,18 +129,16 @@ def _evaluate_split(subset, split):
 
 class ExtraTree(object):
     """ ExtraTree object """
-    def __init__(self, k_value=None, n_min=1):
-        # type: (Optional[int], int) -> None
+    def __init__(self, k_value: Optional[int] = None, n_min: int = 1) -> None:
         super(ExtraTree, self).__init__()
         self.k_value = k_value
         self.n_min = n_min
         self.n_classes = 0
-        self.root_node = Node(None, None, None)
+        self.root_node: Node = Node(None, None, None)
         self._fitted = False
         self._is_classifier = False
 
-    def fit(self, training_set):
-        # type: (Dataset) -> None
+    def fit(self, training_set: Dataset) -> None:
         """ Fit a single tree """
         self._init_build(training_set)
         root_node = self._build_extra_tree_rec(training_set)
@@ -152,21 +148,18 @@ class ExtraTree(object):
 
         self._fitted = True
 
-    def predict_proba(self, samples):
-        # type: (List[List[float]]) -> List[Union[float, List[float]]]
+    def predict_proba(self, samples: Samples) -> List[LeafValues]:
         """ Soft predictions """
         assert self._fitted, "Tree has not been fitted, call fit() first"
         return [_evaluate_rec(self.root_node, sample) for sample in samples]
 
-    def predict(self, samples):
-        # type: (List[List[float]]) -> Union[List[float], List[int]]
+    def predict(self, samples: Samples) -> List[HardPrediction]:
         """ Predict, absoluting probabilities to the largest one """
         soft_pred = self.predict_proba(samples)
         return [_argmax(val) if isinstance(val, list) else val for val in
                 soft_pred]
 
-    def is_classifier(self):
-        # type: () -> bool
+    def is_classifier(self) -> bool:
         """ True if `tree` is fitted on a classification problem
 
         Returns `False` if it was not fitted, or was fitted on a regression
@@ -174,8 +167,7 @@ class ExtraTree(object):
         """
         return self._is_classifier
 
-    def _split_node(self, subset):
-        # type: (Dataset) -> Split
+    def _split_node(self, subset: Dataset) -> Split:
         """
         Args:
             subset (list): The local learning subset S.
@@ -204,8 +196,7 @@ class ExtraTree(object):
 
         return candidate_splits[candidate_scores.index(max(candidate_scores))]
 
-    def _stop_split(self, subset):
-        # type: (Dataset) -> bool
+    def _stop_split(self, subset: Dataset) -> bool:
         """ Evaluate stopping condition on `subset` """
         if len(subset.outputs) < self.n_min:
             return True
@@ -215,16 +206,14 @@ class ExtraTree(object):
             return True
         return False
 
-    def _make_leaf(self, training_set):
-        # type: (Dataset) -> Union[List[float], float]
+    def _make_leaf(self, training_set: Dataset) -> LeafValues:
         """ Create a leaf node from available data """
         if self._is_classifier:
             return _histogram(training_set.outputs, self.n_classes)
 
         return _mean(training_set.outputs)
 
-    def _build_extra_tree_rec(self, training_set):
-        # type: (Dataset) -> Union[Node, List[float], float]
+    def _build_extra_tree_rec(self, training_set: Dataset) -> NodeValues:
         """ Train an ExtraTree, recursively """
         # Return a leaf
         if self._stop_split(training_set):
@@ -238,8 +227,7 @@ class ExtraTree(object):
         right_node = self._build_extra_tree_rec(right_data)
         return Node(split, left_node, right_node)
 
-    def _init_build(self, training_set):
-        # type: (Dataset) -> None
+    def _init_build(self, training_set: Dataset) -> None:
         """ Initialise building before calling recursive `build` """
         # Some checks
         dims = set(len(sample) for sample in training_set.attributes)
@@ -265,8 +253,7 @@ class ExtraTree(object):
         self.n_classes = n_classes
         self._is_classifier = _is_classifier
 
-    def _score_split(self, subset, split):
-        # type: (Dataset, Split) -> float
+    def _score_split(self, subset: Dataset, split: Split) -> float:
         """ Calculate information gain of a potential split node """
         left_data, right_data = _evaluate_split(subset, split)
 
@@ -293,18 +280,16 @@ class ExtraTree(object):
 class ExtraForest(object):
     """ Ensemble of ExtraTrees """
 
-    def __init__(self, n_trees=10, k_value=None, n_min=1):
-        # type: (int, Optional[int], int) -> None
-
+    def __init__(self, n_trees: int = 10, k_value: Optional[int] = None,
+                 n_min: int = 1) -> None:
         super(ExtraForest, self).__init__()
         self.n_trees = n_trees
         self.k_value = k_value
         self.n_min = n_min
-        self.trees = []  # type: List[ExtraTree]
+        self.trees: List[ExtraTree] = []
         self._is_classifier = False
 
-    def fit(self, training_set):
-        # type: (Dataset) -> None
+    def fit(self, training_set: Dataset) -> None:
         """ Fit each tree in the ensemble """
         self.trees = []
         for _ in range(self.n_trees):
@@ -314,12 +299,13 @@ class ExtraForest(object):
 
         self._is_classifier = self.trees[0].is_classifier()
 
-    def predict(self, samples):
-        # type: (List[List[float]]) -> Union[List[float], List[int]]
+    def predict(self, samples: List[Attributes]) -> List[Number]:
         """ Voted, hard-predict the class/value of the `samples` """
-        votes = [tree.predict(samples) for tree in self.trees]
+        votes: List[List[Number]] = [tree.predict(samples)
+                                     for tree in self.trees]
 
         votes_per_sample = list(zip(*votes))
+        vote_fun: VoteFun
         if not self._is_classifier:
             vote_fun = _mean
         else:
@@ -327,7 +313,6 @@ class ExtraForest(object):
 
         return [vote_fun(sample_votes) for sample_votes in votes_per_sample]
 
-    def __repr__(self):
-        # type: () -> str
+    def __repr__(self) -> str:
         fitted_str = "not fitted" if not self.trees else "fitted"
         return "<Forest (%d trees), %s>" % (self.n_trees, fitted_str)

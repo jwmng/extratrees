@@ -4,6 +4,7 @@ import matplotlib.patches as patches
 
 from src.extratrees import (Dataset, ExtraTree, ExtraForest)
 
+
 def colorize_class(cls):
     """ Map 0..1 to (1, 0, 0)..(0, 0, 1) """
     return (cls, 0, 1-cls)
