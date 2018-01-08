@@ -1,7 +1,7 @@
 .PHONY: test
 
 test:
-	mypy --strict --ignore-missing-imports src
+	mypy --ignore-missing-imports src
 	python -m unittest discover
 
 coverage:
