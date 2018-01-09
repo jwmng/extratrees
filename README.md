@@ -4,9 +4,16 @@ This is a Python implementation of the Extremely Randomized Trees (ExtraTrees)
 technique as proposed in the article
 [Geurts, Ernst & Wehenkel (2005)][geurts2005].
 
-The implementation aims to remain close to the pseudocode given in the article
-and does not require any external dependencies.
+## Goal
 
+This does not aim to be anywhere near a production-ready library.
+Mostly, it is an exercise in optimization and an experiment as to how to
+get some performance in python without using numpy or other third-party compiled
+libraries.
+
+## Installation
+
+Just copy one of the `.py`s in the repository.
 There are three versions here:
 
 - `extratrees.py`: No type annotations, supports `pypy`
@@ -14,8 +21,12 @@ There are three versions here:
 - `extratrees_py3_types.py`: Has python3 type annotations, passes `mypy --strict`,
   does _not_ support `pypy`
 
+There are no external dependencies, though the example script requires
+`matplotlib` to plot results.
 
-## Data
+## Usage
+
+### Data format
 
 Since there is no numpy, one cannot supply `np.array` matrices containing
 attributes and outputs. Instead, a `namedtuple` is used to contain datasets:
@@ -38,7 +49,7 @@ integers or floats.
 Outputs may be either integers (`0...n`, where `n` is the number of classes) or
 floats (for regression problems)
 
-Example:
+### Example
 
 ```python
 from src.extratrees import Dataset, ExtraTree
