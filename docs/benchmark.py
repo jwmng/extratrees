@@ -12,11 +12,15 @@ from pathlib import Path
 train_file = Path('./docs/mnist/mnist_train.csv')
 test_file = Path('./docs/mnist/mnist_test.csv')
 
-def load_data(file_):
+def load_data(file_, n_points=None):
     try:
-        lines = file_.read_text().splitlines()
+        lines = file_.read_text().splitlines()[:n_points]
     except FileNotFoundError:
         print("The MNIST datafiles could not be found. Please see readme.md")
+
+    if n_points:
+        lines = lines[:n_points]
+
     labels = []
     attributes = []
     n_lines = len(lines)
@@ -36,12 +40,12 @@ def score(classifier, test_sample):
 
     return sum(correct) / len(correct)
 
-def bench(n_trees):
+def bench(n_training, n_trees):
     print('-'*20)
     print("Going to train %d trees" % n_trees)
     forest = ExtraForest(n_trees=n_trees, n_min=10)
     print("Loading training data")
-    train_set = load_data(train_file)
+    train_set = load_data(train_file, n_points=n_training)
 
     print("Training...")
     t0 = time.time()
@@ -60,8 +64,10 @@ def bench(n_trees):
 
 if __name__ == '__main__':
     try:
-        n_trees = int(sys.argv[1])
+        n_trees = int(sys.argv[2])
+        n_training = int(sys.argv[1])
     except (IndexError, ValueError):
-        print("Usage: benchmark_mnist.py <n_trees>")
+        print("Usage: benchmark_mnist.py <n_training> <n_trees>")
+        sys.exit(1)
 
-    bench(n_trees)
+    bench(n_training, n_trees)
