@@ -1,12 +1,13 @@
-import unittest
+import math
 import random
-from src.extratrees import (_entropy, _histogram, _mean, Dataset, Split,
+import unittest
+from src.extratrees import (_entropy, _histogram, _mean, Split,
                             _evaluate_split, ExtraTree, Node,
                             _pick_random_split, ExtraForest)
 
-FOURTHS = Dataset([[0], [1], [1], [1],
-                   [1], [0], [0], [0]],
-                  [0, 0, 0, 0, 1, 1, 1, 1])
+FOURTHS = ([[0], [1], [1], [1],
+            [1], [0], [0], [0]],
+            [0, 0, 0, 0, 1, 1, 1, 1])
 
 
 class TestModuleFunctions(unittest.TestCase):
@@ -17,9 +18,9 @@ class TestModuleFunctions(unittest.TestCase):
 
     def test_entropy(self):
         self.assertEqual(_entropy([1, 1]), 0)
-        self.assertEqual(_entropy([0, 1]), 1.0)
-        self.assertAlmostEqual(_entropy([0, 1, 1, 1]), 0.81, 2)
-        self.assertAlmostEqual(_entropy([0, 1, 1]), 0.92, 2)
+        self.assertEqual(_entropy([0, 1]), -math.log(0.5))
+        self.assertAlmostEqual(_entropy([0, 1, 1, 1]), 0.56, 2)
+        self.assertAlmostEqual(_entropy([0, 1, 1]), 0.64, 2)
         self.assertEqual(_entropy([]), -1e10)
 
     def test_mean(self):
@@ -30,7 +31,7 @@ class TestModuleFunctions(unittest.TestCase):
 
     def test_pick_random(self):
         random.seed(0)
-        data = Dataset([[0, 0], [0, 1], [0, 1]], [1, 1, 1])
+        data = ([[0, 0], [0, 1], [0, 1]], [1, 1, 1])
         split = _pick_random_split(data, 1)
 
         # Types
@@ -45,16 +46,16 @@ class TestModuleFunctions(unittest.TestCase):
 
     def test_evaluate_split(self):
         random.seed(0)
-        data = Dataset([[0, 0], [0, 1], [0, 1]], [1, 1, 1])
+        data = ([[0, 0], [0, 1], [0, 1]], [1, 1, 1])
         split = _pick_random_split(data, 1)
         left, right = _evaluate_split(data, split)
-        self.assertEqual(right, Dataset(([0, 0],), (1,)))
-        self.assertEqual(left, Dataset(([0, 1], [0, 1]), (1, 1)))
+        self.assertEqual(right, (([0, 0],), (1,)))
+        self.assertEqual(left, (([0, 1], [0, 1]), (1, 1)))
 
 
 class TestExtraTreeObject(unittest.TestCase):
     def setUp(self):
-        self.data = Dataset([[0, 0], [0, 1], [0, 1]], [0, 1, 1])
+        self.data = ([[0, 0], [0, 1], [0, 1]], [0, 1, 1])
         self.tree = ExtraTree(4, 1)
 
         self.fourths = FOURTHS
@@ -73,7 +74,7 @@ class TestExtraTreeObject(unittest.TestCase):
         # This is a perfect split for self.data
         split = Split(1, 0.5)
         self.assertAlmostEqual(self.tree._score_split(self.data, split),
-                               0.92, 2)
+                               0.64, 2)
 
         # This is a worthless split
         split2 = Split(0, 0.5)
@@ -85,7 +86,7 @@ class TestExtraTreeObject(unittest.TestCase):
         # ssification_Error.php
         self.assertAlmostEqual(self.tree._score_split(self.fourths,
                                                self.fourths_split),
-                               0.19, 2)
+                               0.13, 2)
 
     def test_score_regression(self):
         split = Split(1, 0.5)
@@ -100,15 +101,15 @@ class TestExtraTreeObject(unittest.TestCase):
 
     def test_stop_split(self):
         # Empty set
-        data = Dataset([], [])
+        data = ([], [])
         self.assertTrue(self.tree._stop_split(data))
 
         # Constant outputs
-        data = Dataset([[0], [1]], [1, 1])
+        data = ([[0], [1]], [1, 1])
         self.assertTrue(self.tree._stop_split(data))
 
         # Fully constant attributes
-        data = Dataset([[0, 1], [0, 1]], [0, 1])
+        data = ([[0, 1], [0, 1]], [0, 1])
         self.assertTrue(self.tree._stop_split(data))
 
         # Proper sets
@@ -133,13 +134,12 @@ class TestExtraTreeObject(unittest.TestCase):
         self.assertEqual(tree.root_node.right, [1.0, 0.0])
 
         # Dataset with two-level splits
-
         xval = [[0, 0, 1, 1],
                 [0, 1, 1, 0],
                 [1, 1, 0, 0],
                 [1, 0, 0, 1]]
         yval = [0, 1, 0, 1]
-        data = Dataset(xval, yval)
+        data = (xval, yval)
         random.seed(0)
         tree = ExtraTree()
         tree.fit(data)
@@ -149,16 +149,16 @@ class TestExtraTreeObject(unittest.TestCase):
         self.assertIsInstance(tree.root_node.right, Node)
 
         # The leaf-leaves are always pure
-        self.assertEqual(tree.root_node.left.left, [1.0, 0.0])
-        self.assertEqual(tree.root_node.left.right, [0.0, 1.0])
-        self.assertEqual(tree.root_node.right.left, [0.0, 1.0])
-        self.assertEqual(tree.root_node.right.right, [1.0, 0.0])
+        self.assertEqual(tree.root_node.left.left, [0.0, 0.0])
+        self.assertEqual(tree.root_node.left.right.left, [1.0, 0.0])
+        self.assertEqual(tree.root_node.right.left, [1.0, 0.0])
+        self.assertEqual(tree.root_node.right.right, [0.0, 1.0])
 
     def test_build_tree_regression(self):
         xdata = ([0], [0], [0], [0], [1], [1], [1], [1])
         ydata = (2.0, 2.1, 2.2, 2.3, 3.0, 3.1, 3.2, 3.3)
         tree = ExtraTree()
-        tree.fit(Dataset(xdata, ydata))
+        tree.fit((xdata, ydata))
         self.assertEqual(tree.root_node.split.attribute, 0)
         self.assertTrue(0 < tree.root_node.split.cutoff < 1)
         self.assertAlmostEqual(tree.root_node.left, 3.15)
@@ -201,7 +201,7 @@ class TestExtraTreeObject(unittest.TestCase):
         # This makes the root node a leaf node, which causes problems and
         # therefore is not allowed
         with self.assertRaises(ValueError):
-            tree.fit(Dataset([[1, 1]], [0]))
+            tree.fit(([[1, 1]], [0]))
 
 
 
@@ -232,10 +232,10 @@ class TestForest(unittest.TestCase):
         random.seed(0)
         forest = ExtraForest(n_trees=3, n_min=1)
         forest.fit(self.fourths)
-        pred = forest.predict(self.fourths.attributes)
+        pred = forest.predict(self.fourths[0])
 
         # For all trees, the first split will be somewhere inbetween the single
-        # attributes of `fourths.attributes`. There will be no second split as
+        # attributes of `fourths[0`. There will be no second split as
         # the attributes are uniform after the first split.
         for tree in forest.trees:
             self.assertEqual(tree.root_node.left, [0.75, 0.25])
@@ -247,7 +247,7 @@ class TestForest(unittest.TestCase):
         random.seed(0)
         forest = ExtraForest(n_trees=3, n_min=1)
         forest.fit(self.fourths)
-        pred = forest.predict(self.fourths.attributes)
+        pred = forest.predict(self.fourths[0])
 
         for tree in forest.trees:
             self.assertEqual(tree.root_node.left, [0.75, 0.25])
@@ -259,7 +259,7 @@ class TestForest(unittest.TestCase):
         xdata = ([0], [0], [0], [0], [1], [1], [1], [1])
         ydata = (2.0, 2.1, 2.2, 2.3, 3.0, 3.1, 3.2, 3.3)
         forest = ExtraForest()
-        forest.fit(Dataset(xdata, ydata))
+        forest.fit((xdata, ydata))
         pred = forest.predict(xdata)
 
         # These are the means of the xdata classes, since after the first split
