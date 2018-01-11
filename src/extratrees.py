@@ -4,17 +4,34 @@ extratrees_untyped.py - Untyped version of extratrees.py
 For pypy use
 """
 
+import time
 import math
 import random
-from collections import namedtuple, Counter
+from collections import namedtuple
 from statistics import variance
 
+TIMES = {}
+TIME0 = 0
 MAXENTROPY = 1e10
 
 Node = namedtuple('Node', ['split', 'left', 'right'])
 Dataset = namedtuple('Dataset', ['attributes', 'outputs'])
 
 Split = namedtuple('Split', ['attribute', 'cutoff'])
+
+##### Temporary timing functions #####
+
+def tic():
+    global TIME0
+    TIME0 = time.time()
+
+def toc(name):
+    global TIME0
+    TIMES[name] = TIMES.get(name, 0) + (time.time() - TIME0)
+    print(TIMES)
+    tic()
+
+######################################
 
 
 def _variance(values):
@@ -29,8 +46,10 @@ def _entropy(values):
         return -MAXENTROPY
 
     hist = _histogram(values)
-    log_hist = [math.log(val, 2) if val != 0 else 0 for val in hist]
-    return -sum([h_val*lh_val for h_val, lh_val in zip(hist, log_hist)])
+    log_hist = [math.log(val, 2)*val if val != 0 else 0 for val in hist]
+    sum_ = -sum(log_hist)
+
+    return sum_
 
 
 def _histogram(values,
@@ -40,19 +59,30 @@ def _histogram(values,
     Will guess `n_classes` if not specified
     """
     n_classes = n_classes or max(values)+1
+    n_samples = len(values)
 
-    cnt = Counter(values)
-    return [cnt.get(v, 0)/len(values) for v in range(n_classes)]
+    # This is faster than using Counter
+    hist = [0]*n_classes
+    for val in values:
+        hist[val] += 1
+    hist = [x/n_samples for x in hist]
+
+    return hist
 
 
 def _mean(values):
     """ Return the mean of `values` """
+    toc('mean')
     return sum(values)/max(len(values), 1)
 
 
 def _majority(values):
     """ Return the most common value in `values` """
-    return Counter(values).most_common(1)[0][0]
+    counts = [0]*(max(values)+1)
+    for val in values:
+        counts[val] += 1
+
+    return counts.index(max(counts))
 
 
 def _argmax(values):
@@ -85,8 +115,16 @@ def _evaluate_cond(split, attributes):
     Returns `True` if the split condition is true on the attributes
     """
     attribute, cutoff = split
-    return bool(attributes[attribute] > cutoff)
+    return attributes[attribute] > cutoff
 
+
+def _partition_dataset(dataset, filter_vec):
+    """ Partition a dataset using `filter_vec`
+
+    The `filter_vec` argument should have the same length as the dataset.
+    Returns two datasets, one with all elements with a corresponding truthy
+    value in `filter_vec`, one with all the other elements.
+    """
 
 def _evaluate_split(subset, split):
     """" Evaluate split
@@ -98,14 +136,16 @@ def _evaluate_split(subset, split):
     # In theory, this is faster than checking if `idx` is in `left_indices`,
     # since the latter requires enumerating `left_indices` every time.
     # Still, there is room for optimisation here
-    left_indices = [idx for idx in range(len(subset.attributes))
-                    if _evaluate_cond(split, subset.attributes[idx])]
+    all_idxs = tuple(range(len(subset.attributes)))
+    left = [_evaluate_cond(split, subset.attributes[idx])
+            for idx in all_idxs]
 
-    right_indices = [idx for idx in range(len(subset.attributes))
-                     if not _evaluate_cond(split, subset.attributes[idx])]
+    left_indices = [idx for idx in all_idxs if left[idx]]
+    right_indices = [idx for idx in all_idxs if not left[idx]]
 
     left_attributes = tuple(subset.attributes[idx] for idx in left_indices)
     right_attributes = tuple(subset.attributes[idx] for idx in right_indices)
+
     left_outputs = tuple(subset.outputs[idx] for idx in left_indices)
     right_outputs = tuple(subset.outputs[idx] for idx in right_indices)
 
@@ -126,6 +166,7 @@ class ExtraTree(object):
 
     def fit(self, training_set):
         """ Fit a single tree """
+        tic()
         self._init_build(training_set)
         root_node = self._build_extra_tree_rec(training_set)
         if not isinstance(root_node, Node):
@@ -166,6 +207,7 @@ class ExtraTree(object):
         """
         # select K attributes; this is arguably the fastest way to obtain a
         # number of random indices without replacement
+        tic()
         n_attributes = list(range(len(subset.attributes[0])))
         random.shuffle(n_attributes)
 
@@ -180,7 +222,8 @@ class ExtraTree(object):
         candidate_scores = [self._score_split(subset, split)
                             for split in candidate_splits]
 
-        return candidate_splits[candidate_scores.index(max(candidate_scores))]
+        best_candidate_idx = _argmax(candidate_scores)
+        return candidate_splits[best_candidate_idx]
 
     def _stop_split(self, subset):
         """ Evaluate stopping condition on `subset` """
@@ -202,6 +245,7 @@ class ExtraTree(object):
     def _build_extra_tree_rec(self, training_set):
         """ Train an ExtraTree, recursively """
         # Return a leaf
+        tic()
         if self._stop_split(training_set):
             return self._make_leaf(training_set)
 
@@ -246,13 +290,14 @@ class ExtraTree(object):
         n_left = len(left_data.outputs)
         n_right = len(right_data.outputs)
         n_total = n_left + n_right
+        ratio_left = (n_left/n_total)
 
         # Classifier: note that this is the Shannon information gain. The
         # information metric in the paper may be slightly different
         if self._is_classifier:
             ent_subset = _entropy(subset.outputs)
-            ent_left = (n_left/n_total)*_entropy(left_data.outputs)
-            ent_right = (n_right/n_total)*_entropy(right_data.outputs)
+            ent_left = (ratio_left)*_entropy(left_data.outputs)
+            ent_right = (1-ratio_left)*_entropy(right_data.outputs)
             return ent_subset-ent_left-ent_right
 
         # Regression: use variance information gain
