@@ -2,7 +2,7 @@ from math import pi, sin, cos
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-from src.extratrees import (Dataset, ExtraTree, ExtraForest)
+from src.extratrees import (ExtraTree, ExtraForest)
 
 
 def colorize_class(cls):
@@ -20,9 +20,9 @@ def create_dataset():
     x2 = [r*cos(a-pi) for r, a in zip(radius, angle)]
     y2 = [r*sin(a-pi) for r, a in zip(radius, angle)]
 
-    attributes = list(zip(x1+x2, y1+y2))
-    outputs = [0.0]*len(x1) + [1.0]*len(x2)
-    data = Dataset(attributes, outputs)
+    X = list(zip(x1+x2, y1+y2))
+    Y = [0.0]*len(x1) + [1.0]*len(x2)
+    data = (X, Y)
     return data
 
 
@@ -50,8 +50,8 @@ forest = ExtraForest(n_trees=10, n_min=5)
 forest.fit(data)
 
 # Predict
-pred_tree = tree.predict(data.attributes)
-pred_forest = forest.predict(data.attributes)
+pred_tree = tree.predict(data[0])
+pred_forest = forest.predict(data[0])
 
 fig, axes = plt.subplots(2, 3)
 
@@ -64,13 +64,13 @@ for coords, cls in zip(*data):
 # Plot tree result
 axes[0][1].set_title("Single tree\n (min_samples=5, k=*)")
 for idx, cls in enumerate(pred_tree):
-    axes[0][1].plot(*data.attributes[idx], marker='o',
+    axes[0][1].plot(*data[0][idx], marker='o',
                     color=colorize_class(cls))
 
 # Plot forest result
 axes[0][2].set_title("10 trees\n (min_samples=5, k=*)")
 for idx, cls in enumerate(pred_forest):
-    axes[0][2].plot(*data.attributes[idx], marker='o',
+    axes[0][2].plot(*data[0][idx], marker='o',
                     color=colorize_class(cls))
 
 
