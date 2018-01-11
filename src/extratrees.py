@@ -35,7 +35,6 @@ def toc(name):
     tic()
 ######################################
 
-
 def _variance(values):
     if not values:
         return -MAXENTROPY
@@ -219,10 +218,11 @@ class ExtraTree(object):
         """
         # select K attributes; this is (arguably) the fastest way to obtain a
         # number of random indices without replacement
-        n_attributes = list(range(len(subset[0][0])))
+        n_attributes = len(subset[0][0])
+        attributes = list(range(n_attributes))
         random.shuffle(n_attributes)
 
-        candidate_attributes = n_attributes[:self.k_value]
+        candidate_attributes = attributes[:self.k_value]
 
         candidate_splits = [_pick_random_split(subset, attribute)
                             for attribute in candidate_attributes]
@@ -287,6 +287,7 @@ class ExtraTree(object):
                 self.k_value = n_attributes
 
         n_classes = max(outputs) + 1
+
 
         # If the outputs are neither all float float or all int, we cannot
         # handle them
