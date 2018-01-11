@@ -11,16 +11,17 @@ Mostly, it is an exercise in optimization and an experiment as to how to
 get some performance in python without using numpy or other third-party compiled
 libraries.
 
+Some useful notes:
+
+- To get the most common values or relative frequencies, loops are faster than
+  `collections.Counter`
+- `math.log(x)` is about 30% faster than `math.log(x,2)`
+- Vector multiplication using lists (`sum([a*b for a,b in c])`) is faster when
+  eliminating zeros (if they occur) first (`sum([a*b for a,b in c if b])`)
+
 ## Installation
 
-Just copy one of the `.py`s in the repository.
-There are three versions here:
-
-- `extratrees.py`: No type annotations, supports `pypy`
-- `extratrees_py2_types.py`: Has python2-style type hints, supports `pypy`
-- `extratrees_py3_types.py`: Has python3 type annotations, passes `mypy --strict`,
-  does _not_ support `pypy`
-
+Just copy the `.py` file somewhere and run it.
 There are no external dependencies, though the example script requires
 `matplotlib` to plot results.
 
@@ -29,25 +30,13 @@ There are no external dependencies, though the example script requires
 ### Data format
 
 Since there is no numpy, one cannot supply `np.array` matrices containing
-attributes and outputs. Instead, a `namedtuple` is used to contain datasets:
-
-```python
-Dataset = namedtuple('Dataset', ['attributes', 'outputs'])
-```
+attributes and outputs. Instead, plain lists of lists are used.
 
 If your data is formatted as numpy `X,Y` arrays, use `tolist`:
 
 ```python
-Dataset = namedtuple('Dataset', [X.tolist(), Y.tolist()])
+data =(X.tolist(), Y.tolist())
 ```
-
-- The `attributes` field is a list of _samples_, which in turn are lists of
-attributes. Samples must have consistent shapes and consist exclusively of
-integers or floats.
-
-- The `outputs` must be a list of outputs, one for each sample in `attributes`.
-Outputs may be either integers (`0...n`, where `n` is the number of classes) or
-floats (for regression problems)
 
 ### Example
 
@@ -66,43 +55,55 @@ X = ((1, 0),
 # Labels for each sample
 Y = (1, 0, 2)
 
-data = Dataset(X, Y)
-tree = ExtraTree(n_min=1)
-tree.fit(data)
-tree.predict(data.attributes)
+tree = ExtraTree()
+tree.fit((X, Y))
+tree.predict(X)
 ```
 
 See [example.py](docs/example.py) for an applied example.
 
 ## Performance
 
-This benchmark is performed an Intel i5 7200U with setting `k=n_classes` and
-`n_min=10`.
+This benchmark is performed an Intel i5 7200U with parameters `k=sqrt(n_classes)` 
+and `n_min=10`.
 The table below shows results the MNIST digits dataset.
-The _n samples_ column shows how many samples were used for training, these are
+The _N samples_ column shows how many samples were used for training, these are
 the first `n` of the original training set.
-For evaluation, all 10.000 test samples are used.
-
-|Interpreter   | N samples |  Accuracy | Trees  | Train [s] | Eval [s] |
-|--------------|-----------|-----------|--------|-----------|----------|
-|Python3.6     |      1000 |     0.639 |      1 |         9 |    0.010 |
-|Python3.6     |      1000 |     0.792 |     10 |        94 |    0.065 |
-|Pypy3, py3.5  |      1000 |     0.638 |      1 |         2 |    0.051 |
-|Pypy3, py3.5  |      1000 |     0.773 |     10 |        17 |    0.123 |
-|Pypy3, py3.5  |      1000 |     0.823 |    100 |       178 |    0.329 |
-|Pypy3, py3.5  |     10000 |     0.813 |      1 |        30 |    0.127 |
-|Pypy3, py3.5  |     10000 |     0.918 |     10 |       298 |    0.476 |
-|Pypy3, py3.5  |       All |     0.873 |      1 |       299 |    0.151 |
+All 10.000 available test samples are used for testing.
 
 To run the benchmarks, get the [MNIST-CSV dataset][pjreddie], and put the files 
 in `docs/mnist/` as `mnist_train.csv` and `mnist_test.csv`.
 They are not included in the repository here as I do not own them.
 
+### CPython 3.6.3
+
+| N samples | Trees  |  Accuracy | Train [s] | Eval [s] |
+|-----------|--------|-----------|-----------|----------|
+|      1000 |      1 |     0.560 |      0.39 |    0.068 |
+|      1000 |     10 |     0.791 |      3.36 |    0.057 |
+|      1000 |    100 |     0.875 |     33.79 |    5.480 |
+|     10000 |      1 |     0.735 |      4.18 |    0.084 |
+|     10000 |     10 |     0.902 |    47.041 |    0.760 |
+|   All 60k |      1 |     0.827 |    31.386 |    0.106 |
+|   All 60k |     10 |     0.947 |   324.994 |    0.962 |
+
+### Pypy 3.5.3
+
+| N samples | Trees  |  Accuracy | Train [s] | Eval [s] |
+|-----------|--------|-----------|-----------|----------|
+|      1000 |      1 |     0.561 |     0.389 |    0.079 |
+|      1000 |     10 |     0.777 |     2.351 |    0.258 |
+|      1000 |    100 |     0.880 |    20.574 |    1.477 |
+|     10000 |      1 |     0.744 |     3.156 |    0.086 |
+|     10000 |     10 |     0.906 |    28.834 |    0.301 |
+|   All 60k |      1 |     0.820 |    24.748 |    0.096 |
+|   All 60k |     10 |     0.943 |   226.109 |    0.424 |
+
 
 ### Dataset reference
 
-Mnist: The MNIST dataset in CSV, from [pjreddie.com][pjreddie], originally by
-[LeCun et al (1998)][lecun1998]
+The MNIST dataset in CSV, from [pjreddie.com][pjreddie] was originally proposed
+in [LeCun et al (1998)][lecun1998].
 
 [lecun1998]: http://yann.lecun.com/exdb/publis/pdf/lecun-98.pdf
 [geurts2005]: http://orbi.ulg.ac.be/bitstream/2268/9357/1/geurts-mlj-advance.pdf

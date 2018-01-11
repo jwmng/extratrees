@@ -1,7 +1,13 @@
 """
-extratrees_untyped.py - Untyped version of extratrees.py
+extratrees.py - Implementation of Extremely Randomised Trees
 
-For pypy use
+Geurts, Ernst & Wehenkel (2005)
+http://orbi.ulg.ac.be/bitstream/2268/9357/1/geurts-mlj-advance.pdf
+
+This implementation aims to remain as close as possible to the implementation
+as given in the paper (in pseudocode).
+Most deviations from the pseudocode names are made in orderto adhere to python
+naming and style conventions.
 """
 
 import time
@@ -17,8 +23,7 @@ MAXENTROPY = 1e10
 Node = namedtuple('Node', ['split', 'left', 'right'])
 Split = namedtuple('Split', ['attribute', 'cutoff'])
 
-##### Temporary timing functions #####
-
+# #### Temporary timing functions #####
 def tic():
     global TIME0
     TIME0 = time.time()
@@ -28,26 +33,28 @@ def toc(name):
     TIMES[name] = TIMES.get(name, 0) + (time.time() - TIME0)
     print(TIMES)
     tic()
-
 ######################################
 
 
 def _variance(values):
     if not values:
         return -MAXENTROPY
-    return float(variance(values) if len(values) > 1 else 0)
+    return (variance(values) if len(values) > 1 else 0.0)
 
 
 def _entropy(values):
-    """ Shannon entropy """
+    """
+    Shannon entropy
+
+    This implementation uses log(x,e) instead of log(x,2) because it's around
+    30% faster in the python implementation.
+    """
     if not values:
         return -MAXENTROPY
 
     hist = _histogram(values)
-    log_hist = [math.log(val, 2)*val if val != 0 else 0 for val in hist]
-    sum_ = -sum(log_hist)
-
-    return sum_
+    log_hist = [math.log(val)*val for val in hist if val]
+    return -sum(log_hist)
 
 
 def _histogram(values, n_classes=None):
@@ -56,9 +63,11 @@ def _histogram(values, n_classes=None):
     Will guess `n_classes` if not specified
     """
     n_classes = n_classes or max(values)+1
+    if not values:
+        return [0]*n_classes
+
     n_samples = len(values)
 
-    # This is faster than using Counter
     hist = [0]*n_classes
     for val in values:
         hist[val] += 1
@@ -69,8 +78,9 @@ def _histogram(values, n_classes=None):
 
 def _mean(values):
     """ Return the mean of `values` """
-    toc('mean')
-    return sum(values)/max(len(values), 1)
+    if not values:
+        return 0
+    return sum(values)/len(values)
 
 
 def _majority(values):
@@ -114,13 +124,21 @@ def _evaluate_cond(split, attributes):
     return attributes[attribute] > cutoff
 
 
-def _partition_dataset(dataset, filter_vec):
-    """ Partition a dataset using `filter_vec`
+def _evaluate_split_labels(subset, split):
+    """ Same as `_evaluate_split`, but only returns labels """
+    attributes, outputs = subset
 
-    The `filter_vec` argument should have the same length as the dataset.
-    Returns two datasets, one with all elements with a corresponding truthy
-    value in `filter_vec`, one with all the other elements.
-    """
+    all_idxs = range(len(attributes))
+    left = [_evaluate_cond(split, attribute) for attribute in attributes]
+
+    left_indices = [idx for idx in all_idxs if left[idx]]
+    right_indices = [idx for idx in all_idxs if not left[idx]]
+
+    left_outputs = tuple(outputs[idx] for idx in left_indices)
+    right_outputs = tuple(outputs[idx] for idx in right_indices)
+
+    return left_outputs, right_outputs
+
 
 def _evaluate_split(subset, split):
     """" Evaluate split
@@ -131,9 +149,9 @@ def _evaluate_split(subset, split):
     # Partition the data
     # In theory, this is faster than checking if `idx` is in `left_indices`,
     # since the latter requires enumerating `left_indices` every time.
-    # Still, there is room for optimisation here
+
     attributes, outputs = subset
-    all_idxs = tuple(range(len(attributes)))
+    all_idxs = (range(len(attributes)))
     left = [_evaluate_cond(split, attribute) for attribute in attributes]
 
     left_indices = [idx for idx in all_idxs if left[idx]]
@@ -150,7 +168,7 @@ def _evaluate_split(subset, split):
 
 class ExtraTree(object):
     """ ExtraTree object """
-    def __init__(self, k_value=None, n_min=1):
+    def __init__(self, k_value=None, n_min=2):
         super(ExtraTree, self).__init__()
         self.k_value = k_value
         self.n_min = n_min
@@ -161,7 +179,6 @@ class ExtraTree(object):
 
     def fit(self, training_set):
         """ Fit a single tree """
-        tic()
         self._init_build(training_set)
         root_node = self._build_extra_tree_rec(training_set)
         if not isinstance(root_node, Node):
@@ -200,16 +217,12 @@ class ExtraTree(object):
             Split (idx, cutoff): A split, where `idx` is the attribute index
             and `cutoff` the cutoff value `a_c`
         """
-        # select K attributes; this is arguably the fastest way to obtain a
+        # select K attributes; this is (arguably) the fastest way to obtain a
         # number of random indices without replacement
-        tic()
         n_attributes = list(range(len(subset[0][0])))
         random.shuffle(n_attributes)
 
-        if self.k_value is not None:
-            candidate_attributes = n_attributes[:self.k_value]
-        else:
-            candidate_attributes = n_attributes
+        candidate_attributes = n_attributes[:self.k_value]
 
         candidate_splits = [_pick_random_split(subset, attribute)
                             for attribute in candidate_attributes]
@@ -241,7 +254,6 @@ class ExtraTree(object):
     def _build_extra_tree_rec(self, training_set):
         """ Train an ExtraTree, recursively """
         # Return a leaf
-        tic()
         if self._stop_split(training_set):
             return self._make_leaf(training_set)
 
@@ -259,11 +271,20 @@ class ExtraTree(object):
         attributes, outputs = training_set
         dims = set(len(sample) for sample in attributes)
         assert len(dims) == 1, "Inconsistent attribute sizes"
-        assert len(attributes) == len(training_set[0])
+        assert len(attributes) == len(outputs)
 
         # If there are only integer classes, assume a classification problem
         # Note that booleans pass this test so `True`/`False` are valid classes
         _is_classifier = all(isinstance(val, int) for val in outputs)
+
+        # The default k_values are sqrt(n_attributes) for classification and
+        # n_attributes for regression, as per the paper
+        if self.k_value is None:
+            n_attributes = len(attributes[0])
+            if _is_classifier:
+                self.k_value = int(math.sqrt(n_attributes))
+            else:
+                self.k_value = n_attributes
 
         n_classes = max(outputs) + 1
 
@@ -276,14 +297,12 @@ class ExtraTree(object):
             assert (all(cls in outputs for cls in
                         range(n_classes))), "Classes are incomplete"
 
-        self.n_classes = n_classes
         self._is_classifier = _is_classifier
+        self.n_classes = n_classes
 
     def _score_split(self, subset, split):
         """ Calculate information gain of a potential split node """
-        left_data, right_data = _evaluate_split(subset, split)
-        left_out = left_data[1]
-        right_out = right_data[1]
+        left_out, right_out = _evaluate_split_labels(subset, split)
 
         n_left = len(left_out)
         n_right = len(right_out)
@@ -326,6 +345,7 @@ class ExtraForest(object):
             self.trees.append(tree)
 
         self._is_classifier = self.trees[0].is_classifier()
+        self.k_value = self.trees[0].k_value
 
     def predict(self, samples):
         """ Voted, hard-predict the class/value of the `samples` """
