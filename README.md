@@ -35,7 +35,7 @@ attributes and outputs. Instead, plain lists of lists are used.
 If your data is formatted as numpy `X,Y` arrays, use `tolist`:
 
 ```python
-data =(X.tolist(), Y.tolist())
+data = (X.tolist(), Y.tolist())
 ```
 
 ### Example

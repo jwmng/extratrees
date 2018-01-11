@@ -35,6 +35,7 @@ def toc(name):
     tic()
 ######################################
 
+
 def _variance(values):
     if not values:
         return -MAXENTROPY
@@ -63,7 +64,7 @@ def _histogram(values, n_classes=None):
     """
     n_classes = n_classes or max(values)+1
     if not values:
-        return [0]*n_classes
+        return [0.0]*n_classes
 
     n_samples = len(values)
 
@@ -127,9 +128,9 @@ def _evaluate_split_labels(subset, split):
     """ Same as `_evaluate_split`, but only returns labels """
     attributes, outputs = subset
 
-    all_idxs = range(len(attributes))
+    tic()
+    all_idxs = (range(len(attributes)))
     left = [_evaluate_cond(split, attribute) for attribute in attributes]
-
     left_indices = [idx for idx in all_idxs if left[idx]]
     right_indices = [idx for idx in all_idxs if not left[idx]]
 
@@ -220,7 +221,7 @@ class ExtraTree(object):
         # number of random indices without replacement
         n_attributes = len(subset[0][0])
         attributes = list(range(n_attributes))
-        random.shuffle(n_attributes)
+        random.shuffle(attributes)
 
         candidate_attributes = attributes[:self.k_value]
 
@@ -287,7 +288,6 @@ class ExtraTree(object):
                 self.k_value = n_attributes
 
         n_classes = max(outputs) + 1
-
 
         # If the outputs are neither all float float or all int, we cannot
         # handle them
