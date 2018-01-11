@@ -15,8 +15,6 @@ TIME0 = 0
 MAXENTROPY = 1e10
 
 Node = namedtuple('Node', ['split', 'left', 'right'])
-Dataset = namedtuple('Dataset', ['attributes', 'outputs'])
-
 Split = namedtuple('Split', ['attribute', 'cutoff'])
 
 ##### Temporary timing functions #####
@@ -52,8 +50,7 @@ def _entropy(values):
     return sum_
 
 
-def _histogram(values,
-               n_classes=None):
+def _histogram(values, n_classes=None):
     """
     Return the relative frequency of each int between 0 and n_classes
     Will guess `n_classes` if not specified
@@ -101,8 +98,7 @@ def _evaluate_rec(node, attributes):
 
 def _pick_random_split(subset, attribute):
     """ Pick an (extremely random) split cutoff for `attribute` """
-    attribute_values = [sample[attribute] for sample in
-                        subset.attributes]
+    attribute_values = [sample[attribute] for sample in subset[0]]
 
     max_a, min_a = max(attribute_values), min(attribute_values)
     cut_point = min_a + random.random()*(max_a-min_a)
@@ -136,21 +132,20 @@ def _evaluate_split(subset, split):
     # In theory, this is faster than checking if `idx` is in `left_indices`,
     # since the latter requires enumerating `left_indices` every time.
     # Still, there is room for optimisation here
-    all_idxs = tuple(range(len(subset.attributes)))
-    left = [_evaluate_cond(split, subset.attributes[idx])
-            for idx in all_idxs]
+    attributes, outputs = subset
+    all_idxs = tuple(range(len(attributes)))
+    left = [_evaluate_cond(split, attribute) for attribute in attributes]
 
     left_indices = [idx for idx in all_idxs if left[idx]]
     right_indices = [idx for idx in all_idxs if not left[idx]]
 
-    left_attributes = tuple(subset.attributes[idx] for idx in left_indices)
-    right_attributes = tuple(subset.attributes[idx] for idx in right_indices)
+    left_attributes = tuple(attributes[idx] for idx in left_indices)
+    right_attributes = tuple(attributes[idx] for idx in right_indices)
 
-    left_outputs = tuple(subset.outputs[idx] for idx in left_indices)
-    right_outputs = tuple(subset.outputs[idx] for idx in right_indices)
+    left_outputs = tuple(outputs[idx] for idx in left_indices)
+    right_outputs = tuple(outputs[idx] for idx in right_indices)
 
-    return (Dataset(left_attributes, left_outputs),
-            Dataset(right_attributes, right_outputs))
+    return ((left_attributes, left_outputs), (right_attributes, right_outputs))
 
 
 class ExtraTree(object):
@@ -208,7 +203,7 @@ class ExtraTree(object):
         # select K attributes; this is arguably the fastest way to obtain a
         # number of random indices without replacement
         tic()
-        n_attributes = list(range(len(subset.attributes[0])))
+        n_attributes = list(range(len(subset[0][0])))
         random.shuffle(n_attributes)
 
         if self.k_value is not None:
@@ -227,20 +222,21 @@ class ExtraTree(object):
 
     def _stop_split(self, subset):
         """ Evaluate stopping condition on `subset` """
-        if len(subset.outputs) < self.n_min:
+        attributes, outputs = subset
+        if len(outputs) < self.n_min:
             return True
-        if len(set(tuple(attr) for attr in subset.attributes)) <= 1:
+        if len(set(tuple(attr) for attr in attributes)) <= 1:
             return True
-        if len(set(subset.outputs)) == 1:
+        if len(set(outputs)) == 1:
             return True
         return False
 
     def _make_leaf(self, training_set):
         """ Create a leaf node from available data """
         if self._is_classifier:
-            return _histogram(training_set.outputs, self.n_classes)
+            return _histogram(training_set[1], self.n_classes)
 
-        return _mean(training_set.outputs)
+        return _mean(training_set[1])
 
     def _build_extra_tree_rec(self, training_set):
         """ Train an ExtraTree, recursively """
@@ -260,24 +256,24 @@ class ExtraTree(object):
     def _init_build(self, training_set):
         """ Initialise building before calling recursive `build` """
         # Some checks
-        dims = set(len(sample) for sample in training_set.attributes)
+        attributes, outputs = training_set
+        dims = set(len(sample) for sample in attributes)
         assert len(dims) == 1, "Inconsistent attribute sizes"
-        assert len(training_set.attributes) == len(training_set.outputs)
+        assert len(attributes) == len(training_set[0])
 
         # If there are only integer classes, assume a classification problem
         # Note that booleans pass this test so `True`/`False` are valid classes
-        _is_classifier = all(isinstance(val, int)
-                             for val in training_set.outputs)
+        _is_classifier = all(isinstance(val, int) for val in outputs)
 
-        n_classes = max(training_set.outputs) + 1
+        n_classes = max(outputs) + 1
 
         # If the outputs are neither all float float or all int, we cannot
         # handle them
         if not _is_classifier:
             assert all(isinstance(val, float)
-                       for val in training_set.outputs), "Unknown output types"
+                       for val in outputs), "Unknown output types"
         else:
-            assert (all(cls in training_set.outputs for cls in
+            assert (all(cls in outputs for cls in
                         range(n_classes))), "Classes are incomplete"
 
         self.n_classes = n_classes
@@ -286,25 +282,27 @@ class ExtraTree(object):
     def _score_split(self, subset, split):
         """ Calculate information gain of a potential split node """
         left_data, right_data = _evaluate_split(subset, split)
+        left_out = left_data[1]
+        right_out = right_data[1]
 
-        n_left = len(left_data.outputs)
-        n_right = len(right_data.outputs)
+        n_left = len(left_out)
+        n_right = len(right_out)
         n_total = n_left + n_right
         ratio_left = (n_left/n_total)
 
         # Classifier: note that this is the Shannon information gain. The
         # information metric in the paper may be slightly different
         if self._is_classifier:
-            ent_subset = _entropy(subset.outputs)
-            ent_left = (ratio_left)*_entropy(left_data.outputs)
-            ent_right = (1-ratio_left)*_entropy(right_data.outputs)
+            ent_subset = _entropy(subset[1])
+            ent_left = (ratio_left)*_entropy(left_out)
+            ent_right = (1-ratio_left)*_entropy(right_out)
             return ent_subset-ent_left-ent_right
 
         # Regression: use variance information gain
-        subset_var = _variance(subset.outputs)
+        subset_var = _variance(subset[1])
         return float((subset_var
-                      - (n_left/n_total)*_variance(left_data.outputs)
-                      - (n_right/n_total)*_variance(right_data.outputs))
+                      - (n_left/n_total)*_variance(left_out)
+                      - (n_right/n_total)*_variance(right_out))
                      / subset_var)
 
 

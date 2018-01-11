@@ -2,7 +2,7 @@ import time
 import sys
 from pathlib import Path
 
-from src.extratrees import Dataset, ExtraForest
+from src.extratrees import ExtraForest
 
 
 TRAIN_FILE = Path('./docs/mnist/mnist_train.csv')
@@ -39,14 +39,14 @@ def load_data(file_, n_points=None):
         split_ = line.split(',')
         labels.append(int(split_[0]))
         attributes.append([int(j) for j in split_[1:]])
-    return Dataset(attributes, labels)
+    return (attributes, labels)
 
 
 def score(classifier, test_sample):
     """ Accuracy on test set.  """
-    predictions = classifier.predict(test_sample.attributes)
+    predictions = classifier.predict(test_sample[0])
     correct = [pred == true
-               for pred, true in zip(predictions, test_sample.outputs)]
+               for pred, true in zip(predictions, test_sample[1])]
 
     return sum(correct) / len(correct)
 
