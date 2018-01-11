@@ -53,8 +53,13 @@ def _entropy(values):
         return -MAXENTROPY
 
     hist = _histogram(values)
-    log_hist = [math.log(val)*val for val in hist if val]
-    return -sum(log_hist)
+
+    # This seems actually faster than list comprehensions
+    entropy_sum = 0
+    for val in hist:
+        if val:
+            entropy_sum += math.log(val)*val
+    return -entropy_sum
 
 
 def _histogram(values, n_classes=None):
