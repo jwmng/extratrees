@@ -75,6 +75,9 @@ To run the benchmarks, get the [MNIST-CSV dataset][pjreddie], and put the files
 in `docs/mnist/` as `mnist_train.csv` and `mnist_test.csv`.
 They are not included in the repository here as I do not own them.
 
+_Note:_ Validity of these numbers subject to change with updates. Also,
+`sklearn.ensemble.ExtraTreesClassifier` seems to be about 60x faster.
+
 ### CPython 3.6.3
 
 | N samples | Trees  |  Accuracy | Train [s] | Eval [s] |

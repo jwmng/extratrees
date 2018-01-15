@@ -66,7 +66,7 @@ def bench(train_data, test_data, n_trees):
 
     print('-'*20)
     print("Going to train %d trees" % n_trees)
-    forest = ExtraForest(n_trees=n_trees, n_min=10)
+    forest = ExtraForest(n_trees=n_trees, n_min=10, criterion="entropy")
 
     print("Training...")
     t_start = time.time()

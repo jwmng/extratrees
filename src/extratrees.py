@@ -16,6 +16,7 @@ import random
 from collections import namedtuple
 from statistics import variance
 
+
 TIMES = {}
 TIME0 = 0
 MAXENTROPY = 1e10
@@ -61,6 +62,18 @@ def _entropy(values):
             entropy_sum += math.log(val)*val
 
     return -entropy_sum
+
+
+def _gini(values):
+    """ Gini impurity """
+    if not values:
+        return -MAXENTROPY
+    hist = _histogram(values)
+    imp_sum = 0
+    for val in hist:
+        imp_sum += val*(1-val)
+
+    return imp_sum
 
 
 def _histogram(values, n_classes=None):
@@ -174,7 +187,7 @@ def _evaluate_split(subset, split):
 
 class ExtraTree(object):
     """ ExtraTree object """
-    def __init__(self, k_value=None, n_min=2):
+    def __init__(self, k_value=None, n_min=2, criterion="entropy"):
         super(ExtraTree, self).__init__()
         self.k_value = k_value
         self.n_min = n_min
@@ -182,6 +195,10 @@ class ExtraTree(object):
         self.root_node = Node(None, None, None)
         self._fitted = False
         self._is_classifier = False
+        try:
+            self.criterion = {"entropy": _entropy, "gini": _gini}[criterion]
+        except KeyError:
+            raise ValueError("Criterion '%s' unknown" % criterion)
 
     def fit(self, training_set):
         """ Fit a single tree """
@@ -319,9 +336,9 @@ class ExtraTree(object):
         # Classifier: note that this is the Shannon information gain. The
         # information metric in the paper may be slightly different
         if self._is_classifier:
-            ent_subset = _entropy(subset[1])
-            ent_left = (ratio_left)*_entropy(left_out)
-            ent_right = (1-ratio_left)*_entropy(right_out)
+            ent_subset = self.criterion(subset[1])
+            ent_left = (ratio_left)*self.criterion(left_out)
+            ent_right = (1-ratio_left)*self.criterion(right_out)
             return ent_subset-ent_left-ent_right
 
         # Regression: use variance information gain
@@ -335,19 +352,21 @@ class ExtraTree(object):
 class ExtraForest(object):
     """ Ensemble of ExtraTrees """
 
-    def __init__(self, n_trees=10, k_value=None, n_min=1):
+    def __init__(self, n_trees=10, k_value=None, n_min=1, criterion="entropy"):
         super(ExtraForest, self).__init__()
         self.n_trees = n_trees
         self.k_value = k_value
         self.n_min = n_min
         self.trees = []
         self._is_classifier = False
+        self.criterion = criterion
 
     def fit(self, training_set):
         """ Fit each tree in the ensemble """
         self.trees = []
         for _ in range(self.n_trees):
-            tree = ExtraTree(k_value=self.k_value, n_min=self.n_min)
+            tree = ExtraTree(k_value=self.k_value, n_min=self.n_min,
+                             criterion=self.criterion)
             tree.fit(training_set)
             self.trees.append(tree)
 
