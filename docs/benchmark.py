@@ -1,7 +1,7 @@
 import time
 import sys
 from pathlib import Path
-from sklearn.ensemble import ExtraTreesClassifier
+# from sklearn.ensemble import ExtraTreesClassifier
 
 from src.extratrees import ExtraForest
 
@@ -78,21 +78,6 @@ def bench(train_data, test_data, n_trees):
     print("Testing")
     t_start = time.time()
     test_score = score(forest, test_data)
-    t_test = time.time() - t_start
-    print("Evaluated in %.3fs" % t_test)
-    print("Score: %.3f" % test_score)
-
-    print('-'*20, "sklearn")
-    forest = ExtraTreesClassifier(n_estimators=n_trees, criterion="entropy",
-                                  min_samples_split=10, min_samples_leaf=10,
-                                  max_features="auto")
-    t_start = time.time()
-    forest.fit(*train_data)
-    t_train = time.time() - t_start
-    print("Trained in %.3fs" % t_train)
-    print("Testing")
-    t_start = time.time()
-    test_score = forest.score(*test_data)
     t_test = time.time() - t_start
     print("Evaluated in %.3fs" % t_test)
     print("Score: %.3f" % test_score)

@@ -52,12 +52,22 @@ def _entropy(values):
     return -entropy_sum
 
 
+def _is_uniform(vals):
+    """ Returns true if all elements in `vals` are the same """
+    first = vals[0]
+    for other in vals[1:]:
+        if first != other:
+            return False
+    return True
+
+
 def _gini(values):
     """ Gini impurity """
     if not values:
         return -MAXENTROPY
     hist = _histogram(values)
-    imp_sum = 0
+
+    imp_sum = 0.0
     for val in hist:
         imp_sum += val*(1-val)
 
@@ -74,11 +84,11 @@ def _histogram(values, n_classes=None):
         return [0.0]*n_classes
 
     n_samples = len(values)
+    plusval = (1/n_samples)
 
     hist = [0]*n_classes
     for val in values:
-        hist[val] += 1
-    hist = [x/n_samples for x in hist]
+        hist[val] += plusval
 
     return hist
 
@@ -258,10 +268,14 @@ class ExtraTree(object):
         attributes, outputs = subset
         if len(outputs) < self.n_min:
             return True
-        if len(set(outputs)) == 1:
+
+        if _is_uniform(outputs):
             return True
-        if len(set(tuple(attr) for attr in attributes)) <= 1:
+
+        # This assures that there are at least two non-equal attributes
+        if _is_uniform(attributes):
             return True
+
         return False
 
     def _make_leaf(self, training_set):
