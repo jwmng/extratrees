@@ -12,6 +12,7 @@ naming and style conventions.
 
 import math
 import random
+import threading
 from collections import namedtuple
 from statistics import variance
 
@@ -195,6 +196,7 @@ class ExtraTree(object):
         self.root_node = root_node
 
         self._fitted = True
+        print("Tree %s is fitted" % id(self))
 
     def predict_proba(self, samples):
         """ Soft predictions """
@@ -348,13 +350,18 @@ class ExtraForest(object):
         self.criterion = criterion
 
     def fit(self, training_set):
-        """ Fit each tree in the ensemble """
+        """ Fit each tree in the ensemble (multi-threaded) """
         self.trees = []
+        jobs = []
         for _ in range(self.n_trees):
             tree = ExtraTree(k_value=self.k_value, n_min=self.n_min,
                              criterion=self.criterion)
-            tree.fit(training_set)
             self.trees.append(tree)
+            thread = threading.Thread(target=tree.fit,
+                                      args=(training_set,))
+            thread.start()
+            thread.join()
+            jobs.append(thread)
 
         self._is_classifier = self.trees[0].is_classifier()
         self.k_value = self.trees[0].k_value
