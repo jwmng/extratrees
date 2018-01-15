@@ -147,7 +147,6 @@ def _evaluate_split_labels(subset, split):
     """ Same as `_evaluate_split`, but only returns labels """
     attributes, outputs = subset
 
-    tic()
     all_idxs = (range(len(attributes)))
     left = [_evaluate_cond(split, attribute) for attribute in attributes]
     left_indices = [idx for idx in all_idxs if left[idx]]
