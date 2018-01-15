@@ -12,7 +12,6 @@ naming and style conventions.
 
 import math
 import random
-import threading
 from collections import namedtuple
 from statistics import variance
 
@@ -45,9 +44,10 @@ def _entropy(values):
 
     # This is >10% faster than a list comprehension in most cases
     entropy_sum = 0
+    log = math.log
     for val in hist:
         if val:
-            entropy_sum += math.log(val)*val
+            entropy_sum += log(val)*val
 
     return -entropy_sum
 
@@ -106,7 +106,11 @@ def _argmax(values):
 
 def _evaluate_rec(node, attributes):
     """ Recursively traverse a node with `attributes` until a leaf is found"""
-    if not isinstance(node, Node):
+    # This is slightly faster than `isinstance`, since all should have a `split`
+    # field, while histograms do not
+    try:
+        node.split
+    except AttributeError:
         return node
 
     next_ = node.left if _evaluate_cond(node.split, attributes) else node.right
@@ -155,7 +159,6 @@ def _evaluate_split(subset, split):
     # Partition the data
     # In theory, this is faster than checking if `idx` is in `left_indices`,
     # since the latter requires enumerating `left_indices` every time.
-
     attributes, outputs = subset
     all_idxs = (range(len(attributes)))
     left = [_evaluate_cond(split, attribute) for attribute in attributes]
@@ -193,10 +196,9 @@ class ExtraTree(object):
         root_node = self._build_extra_tree_rec(training_set)
         if not isinstance(root_node, Node):
             raise ValueError("No samples")
-        self.root_node = root_node
 
+        self.root_node = root_node
         self._fitted = True
-        print("Tree %s is fitted" % id(self))
 
     def predict_proba(self, samples):
         """ Soft predictions """
@@ -228,31 +230,37 @@ class ExtraTree(object):
             Split (idx, cutoff): A split, where `idx` is the attribute index
             and `cutoff` the cutoff value `a_c`
         """
-        # select K attributes; this is (arguably) the fastest way to obtain a
-        # number of random indices without replacement
+        # This looks slow, but seems to be the fastest way using only python.
+        # It is a lot faster than using `random.shuffle` for picking without
+        # replacement, anyway
         n_attributes = len(subset[0][0])
-        attributes = list(range(n_attributes))
-        random.shuffle(attributes)
+        k_value = self.k_value
+        randint = random.randint
+        avail = list(range(n_attributes))
 
-        candidate_attributes = attributes[:self.k_value]
+        best_score = -MAXENTROPY
+        best_split = None
 
-        candidate_splits = [_pick_random_split(subset, attribute)
-                            for attribute in candidate_attributes]
+        # For each `k_value` iterations, take a random attribute from
+        # `available` and use it to build a split
+        for _ in range(k_value):
+            attribute = avail.pop(randint(0, len(avail)-1))
+            split = _pick_random_split(subset, attribute)
+            score = self._score_split(subset, split)
+            if score > best_score:
+                best_score = score
+                best_split = split
 
-        candidate_scores = [self._score_split(subset, split)
-                            for split in candidate_splits]
-
-        best_candidate_idx = _argmax(candidate_scores)
-        return candidate_splits[best_candidate_idx]
+        return best_split
 
     def _stop_split(self, subset):
         """ Evaluate stopping condition on `subset` """
         attributes, outputs = subset
         if len(outputs) < self.n_min:
             return True
-        if len(set(tuple(attr) for attr in attributes)) <= 1:
-            return True
         if len(set(outputs)) == 1:
+            return True
+        if len(set(tuple(attr) for attr in attributes)) <= 1:
             return True
         return False
 
@@ -264,7 +272,6 @@ class ExtraTree(object):
         return _mean(training_set[1])
 
     def _build_extra_tree_rec(self, training_set):
-        """ Train an ExtraTree, recursively """
         # Return a leaf
         if self._stop_split(training_set):
             return self._make_leaf(training_set)
@@ -321,15 +328,15 @@ class ExtraTree(object):
         n_total = n_left + n_right
         ratio_left = (n_left/n_total)
 
-        # Classifier: note that this is the Shannon information gain. The
-        # information metric in the paper may be slightly different
+        # Classification: Use either gini or shannon as entropy metric
+        criterion = self.criterion
         if self._is_classifier:
-            ent_subset = self.criterion(subset[1])
-            ent_left = (ratio_left)*self.criterion(left_out)
-            ent_right = (1-ratio_left)*self.criterion(right_out)
+            ent_subset = criterion(subset[1])
+            ent_left = (ratio_left)*criterion(left_out)
+            ent_right = (1-ratio_left)*criterion(right_out)
             return ent_subset-ent_left-ent_right
 
-        # Regression: use variance information gain
+        # Regression: use variance as entropy metric
         subset_var = _variance(subset[1])
         return float((subset_var
                       - (n_left/n_total)*_variance(left_out)
@@ -352,16 +359,11 @@ class ExtraForest(object):
     def fit(self, training_set):
         """ Fit each tree in the ensemble (multi-threaded) """
         self.trees = []
-        jobs = []
         for _ in range(self.n_trees):
             tree = ExtraTree(k_value=self.k_value, n_min=self.n_min,
                              criterion=self.criterion)
+            tree.fit(training_set)
             self.trees.append(tree)
-            thread = threading.Thread(target=tree.fit,
-                                      args=(training_set,))
-            thread.start()
-            thread.join()
-            jobs.append(thread)
 
         self._is_classifier = self.trees[0].is_classifier()
         self.k_value = self.trees[0].k_value

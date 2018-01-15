@@ -18,6 +18,10 @@ Some useful notes:
 - `math.log(x)` is about 30% faster than `math.log(x,2)`
 - Vector multiplication using lists (`sum([a*b for a,b in c])`) is faster when
   eliminating zeros (if they occur) first (`sum([a*b for a,b in c if b])`)
+- There is sill some room for optimization in the script, but the benchmarks 
+  show **it is about 50x slower** than the implementation `sklearn.ensemble`. 
+  Main reasons seem to be that 1) numpy and sklearn are Cython-optimized 2)
+  thanks to sklearn's presort/sparse optimizations.
 
 ## Installation
 
@@ -75,33 +79,31 @@ To run the benchmarks, get the [MNIST-CSV dataset][pjreddie], and put the files
 in `docs/mnist/` as `mnist_train.csv` and `mnist_test.csv`.
 They are not included in the repository here as I do not own them.
 
-_Note:_ Validity of these numbers subject to change with updates. Also,
-`sklearn.ensemble.ExtraTreesClassifier` seems to be about 60x faster.
 
 ### CPython 3.6.3
 
 | N samples | Trees  |  Accuracy | Train [s] | Eval [s] |
 |-----------|--------|-----------|-----------|----------|
-|      1000 |      1 |       .56 |      0.39 |     0.07 |
-|      1000 |     10 |       .79 |      3.36 |     0.06 |
-|      1000 |    100 |       .87 |     33.79 |     5.48 |
-|     10000 |      1 |       .73 |      4.18 |     0.08 |
-|     10000 |     10 |       .90 |     47.04 |     0.76 |
-|   All 60k |      1 |       .82 |     31.39 |     0.11 |
-|   All 60k |     10 |       .94 |    324.99 |     0.96 |
+|      1000 |      1 |       .58 |      0.29 |     0.07 |
+|      1000 |     10 |       .80 |      2.70 |     0.06 |
+|      1000 |    100 |       .88 |     26.63 |     6.13 |
+|     10000 |      1 |       .74 |      3.99 |     0.09 |
+|     10000 |     10 |       .91 |     38.10 |     0.83 |
+|   All 60k |      1 |       .82 |     29.91 |     0.11 |
+|   All 60k |     10 |       .95 |    307.73 |     1.07 |
 
 ### Pypy 3.5.3
 
-| N samples | Trees  |  Accuracy | Train [s] | Eval [s] |
+| N samples |  Trees |  Accuracy | Train [s] | Eval [s] |
 |-----------|--------|-----------|-----------|----------|
-|      1000 |      1 |       .56 |      0.39 |     0.08 |
-|      1000 |     10 |       .77 |      2.35 |     0.26 |
-|      1000 |    100 |       .88 |     20.57 |     1.48 |
-|     10000 |      1 |       .74 |      3.16 |     0.09 |
-|     10000 |     10 |       .90 |     28.83 |     0.30 |
-|     10000 |    100 |       .94 |    282.34 |     2.34 |
-|   All 60k |      1 |       .82 |     24.75 |     0.10 |
-|   All 60k |     10 |       .94 |    226.11 |     0.42 |
+|      1000 |      1 |       .54 |      0.40 |     0.05 |
+|      1000 |     10 |       .79 |      2.33 |     0.23 |
+|      1000 |    100 |       .88 |     19.37 |     1.46 |
+|     10000 |      1 |       .73 |      3.05 |     0.10 |
+|     10000 |     10 |       .90 |     28.13 |     0.30 |
+|     10000 |    100 |       .95 |    291.82 |     2.36 |
+|   All 60k |      1 |       .83 |     23.83 |     0.12 |
+|   All 60k |     10 |       .95 |    224.119|     0.39 |
 
 
 ### Dataset reference
