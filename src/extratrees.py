@@ -10,7 +10,6 @@ Most deviations from the pseudocode names are made in orderto adhere to python
 naming and style conventions.
 """
 
-import time
 import math
 import random
 from collections import namedtuple
@@ -24,23 +23,11 @@ MAXENTROPY = 1e10
 Node = namedtuple('Node', ['split', 'left', 'right'])
 Split = namedtuple('Split', ['attribute', 'cutoff'])
 
-# #### Temporary timing functions #####
-def tic():
-    global TIME0
-    TIME0 = time.time()
-
-def toc(name):
-    global TIME0
-    TIMES[name] = TIMES.get(name, 0) + (time.time() - TIME0)
-    print(TIMES)
-    tic()
-######################################
-
 
 def _variance(values):
     if not values:
         return -MAXENTROPY
-    return (variance(values) if len(values) > 1 else 0.0)
+    return variance(values) if len(values) > 1 else 0.0
 
 
 def _entropy(values):
