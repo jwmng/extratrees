@@ -80,13 +80,12 @@ def _histogram(values, n_classes=None):
     Will guess `n_classes` if not specified
     """
     n_classes = n_classes or max(values)+1
+    hist = [0.0]*n_classes
     if not values:
-        return [0.0]*n_classes
+        return hist
 
     n_samples = len(values)
     plusval = (1/n_samples)
-
-    hist = [0]*n_classes
     for val in values:
         hist[val] += plusval
 
@@ -116,8 +115,8 @@ def _argmax(values):
 
 def _evaluate_rec(node, attributes):
     """ Recursively traverse a node with `attributes` until a leaf is found"""
-    # This is slightly faster than `isinstance`, since all should have a `split`
-    # field, while histograms do not
+    # This is slightly faster than `isinstance`, since all should have a
+    # `split` field, while histograms do not
     try:
         node.split
     except AttributeError:
@@ -185,16 +184,15 @@ def _evaluate_split(subset, split):
     return ((left_attributes, left_outputs), (right_attributes, right_outputs))
 
 
-class ExtraTree(object):
+class ExtraTreeClassifier(object):
     """ ExtraTree object """
     def __init__(self, k_value=None, n_min=2, criterion="entropy"):
-        super(ExtraTree, self).__init__()
+        super(ExtraTreeClassifier, self).__init__()
         self.k_value = k_value
         self.n_min = n_min
         self.n_classes = 0
         self.root_node = Node(None, None, None)
         self._fitted = False
-        self._is_classifier = False
         try:
             self.criterion = {"entropy": _entropy, "gini": _gini}[criterion]
         except KeyError:
@@ -205,7 +203,7 @@ class ExtraTree(object):
         self._init_build(training_set)
         root_node = self._build_extra_tree_rec(training_set)
         if not isinstance(root_node, Node):
-            raise ValueError("No samples")
+            raise ValueError("Training failed: Not a single split found")
 
         self.root_node = root_node
         self._fitted = True
@@ -218,16 +216,7 @@ class ExtraTree(object):
     def predict(self, samples):
         """ Predict, absoluting probabilities to the largest one """
         soft_pred = self.predict_proba(samples)
-        return [_argmax(val) if isinstance(val, list) else val for val in
-                soft_pred]
-
-    def is_classifier(self):
-        """ True if `tree` is fitted on a classification problem
-
-        Returns `False` if it was not fitted, or was fitted on a regression
-        problem
-        """
-        return self._is_classifier
+        return [_argmax(hist_) for hist_ in soft_pred]
 
     def _split_node(self, subset):
         """
@@ -251,7 +240,7 @@ class ExtraTree(object):
         best_score = -MAXENTROPY
         best_split = None
 
-        # For each `k_value` iterations, take a random attribute from
+        # For each `k_value` iterations, take a (new) random attribute from
         # `available` and use it to build a split
         for _ in range(k_value):
             attribute = avail.pop(randint(0, len(avail)-1))
@@ -264,7 +253,16 @@ class ExtraTree(object):
         return best_split
 
     def _stop_split(self, subset):
-        """ Evaluate stopping condition on `subset` """
+        """
+        Return true, if, for `subset`:
+            1. There are fewer than `n_min` samples left
+            2. All labels in `subset` are equal
+            3. All attributes `subset` are equal
+
+        The order is chosen empirically. Also, the uniformity check on
+        attributes tends to be slower than on the others, especially with
+        highly dimensional data.
+        """
         attributes, outputs = subset
         if len(outputs) < self.n_min:
             return True
@@ -272,31 +270,35 @@ class ExtraTree(object):
         if _is_uniform(outputs):
             return True
 
-        # This assures that there are at least two non-equal attributes
         if _is_uniform(attributes):
             return True
 
         return False
 
     def _make_leaf(self, training_set):
-        """ Create a leaf node from available data """
-        if self._is_classifier:
-            return _histogram(training_set[1], self.n_classes)
-
-        return _mean(training_set[1])
+        """ Create a leaf node (histogram) from available data """
+        return _histogram(training_set[1], self.n_classes)
 
     def _build_extra_tree_rec(self, training_set):
-        # Return a leaf
+        """ Recursively build the tree """
+        # Return a leaf if stopping condition is reached
         if self._stop_split(training_set):
             return self._make_leaf(training_set)
 
-        # Split and recursively add children
+        # Get the optimal split and partition data for child nodes
         split = self._split_node(training_set)
         left_data, right_data = _evaluate_split(training_set, split)
 
+        # Recursively train children
         left_node = self._build_extra_tree_rec(left_data)
         right_node = self._build_extra_tree_rec(right_data)
+
         return Node(split, left_node, right_node)
+
+    def __output_check(self, outputs):
+        # All classes are always integers (this works for booleans too)
+        assert all(isinstance(output, int) for output in outputs), (
+            "All class labels should be int or bool")
 
     def _init_build(self, training_set):
         """ Initialise building before calling recursive `build` """
@@ -306,31 +308,20 @@ class ExtraTree(object):
         assert len(dims) == 1, "Inconsistent attribute sizes"
         assert len(attributes) == len(outputs)
 
-        # If there are only integer classes, assume a classification problem
-        # Note that booleans pass this test so `True`/`False` are valid classes
-        _is_classifier = all(isinstance(val, int) for val in outputs)
-
-        # The default k_values are sqrt(n_attributes) for classification and
-        # n_attributes for regression, as per the paper
-        if self.k_value is None:
-            n_attributes = len(attributes[0])
-            if _is_classifier:
-                self.k_value = int(math.sqrt(n_attributes))
-            else:
-                self.k_value = n_attributes
-
+        # We know that classes/attributes are consistent by the check before
+        n_attributes = len(attributes[0])
         n_classes = max(outputs) + 1
 
-        # If the outputs are neither all float float or all int, we cannot
-        # handle them
-        if not _is_classifier:
-            assert all(isinstance(val, float)
-                       for val in outputs), "Unknown output types"
-        else:
-            assert (all(cls in outputs for cls in
-                        range(n_classes))), "Classes are incomplete"
+        self.__output_check(outputs)
 
-        self._is_classifier = _is_classifier
+        # Since n_classes is the maximum of outputs, we only need to check if
+        # they are strictly positive
+        assert all(output >= 0 for output in outputs) and min(outputs) == 0, (
+            "Class labels should start at 0 and be strictly positive")
+
+        # The default k_values is sqrt(n_attributes) for classification
+        # in the original article
+        self.k_value = self.k_value or round(math.sqrt(n_attributes))
         self.n_classes = n_classes
 
     def _score_split(self, subset, split):
@@ -341,51 +332,69 @@ class ExtraTree(object):
         n_right = len(right_out)
         n_total = n_left + n_right
         ratio_left = (n_left/n_total)
+        criterion = self.criterion
 
         # Classification: Use either gini or shannon as entropy metric
-        criterion = self.criterion
-        if self._is_classifier:
-            ent_subset = criterion(subset[1])
-            ent_left = (ratio_left)*criterion(left_out)
-            ent_right = (1-ratio_left)*criterion(right_out)
-            return ent_subset-ent_left-ent_right
+        ent_subset = criterion(subset[1])
+        ent_left = (ratio_left)*criterion(left_out)
+        ent_right = (1-ratio_left)*criterion(right_out)
+        return ent_subset-ent_left-ent_right
 
-        # Regression: use variance as entropy metric
-        subset_var = _variance(subset[1])
-        return float((subset_var
-                      - (n_left/n_total)*_variance(left_out)
-                      - (n_right/n_total)*_variance(right_out))
-                     / subset_var)
+
+class ExtraTreeRegressor(ExtraTreeClassifier):
+    """ ExtraTree for regression """
+    def __init__(self, k_value=None, n_min=2):
+        super(ExtraTreeRegressor, self).__init__(k_value, n_min)
+        self.criterion = _variance
+
+    def predict_proba(self, samples):
+        """ Regressors have no soft prediction """
+        raise NotImplementedError("No probabilistic prediction for regressor")
+
+    def predict(self, samples):
+        """ Return the leaf mean value for each sample """
+        assert self._fitted, "Tree has not been fitted, call fit() first"
+
+        return [_evaluate_rec(self.root_node, sample) for sample in samples]
+
+    def _make_leaf(self, training_set):
+        """ Create a leaf node from available data """
+        return _mean(training_set[1])
+
+    def __output_check(self, outputs):
+        assert all(isinstance(output, (float, int)) for output in outputs), (
+            "All class labels should be floats or ints")
 
 
 class ExtraForest(object):
     """ Ensemble of ExtraTrees """
 
-    def __init__(self, n_trees=10, k_value=None, n_min=1, criterion="entropy"):
+    def __init__(self, n_trees=10, **clf_args):
         super(ExtraForest, self).__init__()
         self.n_trees = n_trees
-        self.k_value = k_value
-        self.n_min = n_min
         self.trees = []
+        self.clf_args = clf_args
         self._is_classifier = False
-        self.criterion = criterion
 
     def fit(self, training_set):
         """ Fit each tree in the ensemble (multi-threaded) """
         self.trees = []
+
+        # Classification problem if _all_ outputs are int/bool type, else
+        # regression
+        is_classifier = all(isinstance(val, int) for val in training_set[1])
+        self._is_classifier = is_classifier
+        base_classifier = (ExtraTreeClassifier if is_classifier
+                           else ExtraTreeRegressor)
+
         for _ in range(self.n_trees):
-            tree = ExtraTree(k_value=self.k_value, n_min=self.n_min,
-                             criterion=self.criterion)
+            tree = base_classifier(**self.clf_args)
             tree.fit(training_set)
             self.trees.append(tree)
 
-        self._is_classifier = self.trees[0].is_classifier()
-        self.k_value = self.trees[0].k_value
-
-    def predict(self, samples):
+    def predict(self, test_attributes):
         """ Voted, hard-predict the class/value of the `samples` """
-        votes = [tree.predict(samples) for tree in self.trees]
-
+        votes = [tree.predict(test_attributes) for tree in self.trees]
         votes_per_sample = list(zip(*votes))
         if not self._is_classifier:
             vote_fun = _mean
