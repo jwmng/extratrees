@@ -46,8 +46,10 @@ def _entropy(values, n_classes):
     entropy_sum = 0
     log = math.log
     for val in hist:
-        if val:
+        try:
             entropy_sum += log(val)*val
+        except ValueError:
+            continue
 
     return -entropy_sum
 
@@ -326,9 +328,6 @@ class ExtraTreeClassifier(object):
         """ Calculate information gain of a potential split node """
         n_left, n_right, left_out, right_out = _evaluate_split_labels(subset,
                                                                       split)
-
-        # n_left = len(left_out)
-        # n_right = len(right_out)
         n_total = n_left + n_right
         ratio_left = (n_left/n_total)
         criterion = self.criterion

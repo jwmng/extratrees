@@ -1,13 +1,10 @@
 import time
 import sys
-from pathlib import Path
-# from sklearn.ensemble import ExtraTreesClassifier
 
 from src.extratrees import ExtraForest
 
-
-TRAIN_FILE = Path('./docs/mnist/mnist_train.csv')
-TEST_FILE = Path('./docs/mnist/mnist_test.csv')
+TRAIN_FILE = './docs/mnist/mnist_train.csv'
+TEST_FILE = './docs/mnist/mnist_test.csv'
 
 
 def load_data(file_, n_points=None):
@@ -20,13 +17,16 @@ def load_data(file_, n_points=None):
     https://pjreddie.com/media/files/mnist_train.csv
 
     Args:
-        file_ (pathlib.Path): File to load
+        file_ (str): File path to load
         n_points (int): Number of datapoints to load. Loads all if not `None`.
     """
     try:
-        lines = file_.read_text().splitlines()[:n_points]
+        with open(file_) as infile:
+            data = infile.read()
     except FileNotFoundError:
         print("The MNIST datafiles could not be found. Please see readme.md")
+
+    lines = data.splitlines()[:n_points]
 
     if n_points:
         lines = lines[:n_points]
