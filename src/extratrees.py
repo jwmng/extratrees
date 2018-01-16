@@ -30,7 +30,7 @@ def _variance(values):
     return variance(values) if len(values) > 1 else 0.0
 
 
-def _entropy(values):
+def _entropy(values, n_classes):
     """
     Shannon entropy
 
@@ -40,7 +40,7 @@ def _entropy(values):
     if not values:
         return -MAXENTROPY
 
-    hist = _histogram(values)
+    hist = _histogram(values, n_classes)
 
     # This is >10% faster than a list comprehension in most cases
     entropy_sum = 0
@@ -61,11 +61,11 @@ def _is_uniform(vals):
     return True
 
 
-def _gini(values):
+def _gini(values, n_classes):
     """ Gini impurity """
     if not values:
         return -MAXENTROPY
-    hist = _histogram(values)
+    hist = _histogram(values, n_classes)
 
     imp_sum = 0.0
     for val in hist:
@@ -74,12 +74,11 @@ def _gini(values):
     return imp_sum
 
 
-def _histogram(values, n_classes=None):
+def _histogram(values, n_classes):
     """
     Return the relative frequency of each int between 0 and n_classes
     Will guess `n_classes` if not specified
     """
-    n_classes = n_classes or max(values)+1
     hist = [0.0]*n_classes
     if not values:
         return hist
@@ -148,15 +147,15 @@ def _evaluate_split_labels(subset, split):
     """ Same as `_evaluate_split`, but only returns labels """
     attributes, outputs = subset
 
-    all_idxs = (range(len(attributes)))
+    all_idxs = range(len(outputs))
     left = [_evaluate_cond(split, attribute) for attribute in attributes]
-    left_indices = [idx for idx in all_idxs if left[idx]]
-    right_indices = [idx for idx in all_idxs if not left[idx]]
+    n_left = sum(left)
+    n_right = len(outputs)-n_left
 
-    left_outputs = tuple(outputs[idx] for idx in left_indices)
-    right_outputs = tuple(outputs[idx] for idx in right_indices)
+    left_outputs = tuple(outputs[idx] for idx in all_idxs if left[idx])
+    right_outputs = tuple(outputs[idx] for idx in all_idxs if not left[idx])
 
-    return left_outputs, right_outputs
+    return n_left, n_right, left_outputs, right_outputs
 
 
 def _evaluate_split(subset, split):
@@ -234,7 +233,6 @@ class ExtraTreeClassifier(object):
         # replacement, anyway
         n_attributes = len(subset[0][0])
         k_value = self.k_value
-        randint = random.randint
         avail = list(range(n_attributes))
 
         best_score = -MAXENTROPY
@@ -243,7 +241,7 @@ class ExtraTreeClassifier(object):
         # For each `k_value` iterations, take a (new) random attribute from
         # `available` and use it to build a split
         for _ in range(k_value):
-            attribute = avail.pop(randint(0, len(avail)-1))
+            attribute = avail.pop(int(random.random()*(len(avail)-1)))
             split = _pick_random_split(subset, attribute)
             score = self._score_split(subset, split)
             if score > best_score:
@@ -326,18 +324,20 @@ class ExtraTreeClassifier(object):
 
     def _score_split(self, subset, split):
         """ Calculate information gain of a potential split node """
-        left_out, right_out = _evaluate_split_labels(subset, split)
+        n_left, n_right, left_out, right_out = _evaluate_split_labels(subset,
+                                                                      split)
 
-        n_left = len(left_out)
-        n_right = len(right_out)
+        # n_left = len(left_out)
+        # n_right = len(right_out)
         n_total = n_left + n_right
         ratio_left = (n_left/n_total)
         criterion = self.criterion
+        n_classes = self.n_classes
 
         # Classification: Use either gini or shannon as entropy metric
-        ent_subset = criterion(subset[1])
-        ent_left = (ratio_left)*criterion(left_out)
-        ent_right = (1-ratio_left)*criterion(right_out)
+        ent_subset = criterion(subset[1], n_classes)
+        ent_left = (ratio_left)*criterion(left_out, n_classes)
+        ent_right = (1-ratio_left)*criterion(right_out, n_classes)
         return ent_subset-ent_left-ent_right
 
 
