@@ -21,7 +21,6 @@ TIME0 = 0
 MAXENTROPY = 1e10
 
 Node = namedtuple('Node', ['split', 'left', 'right'])
-Split = namedtuple('Split', ['attribute', 'cutoff'])
 
 
 def _variance(values):
@@ -133,7 +132,7 @@ def _pick_random_split(subset, attribute):
 
     max_a, min_a = max(attribute_values), min(attribute_values)
     cut_point = min_a + random.random()*(max_a-min_a)
-    return Split(attribute, cut_point)
+    return (attribute, cut_point)
 
 
 def _evaluate_cond(split, attributes):
@@ -141,8 +140,7 @@ def _evaluate_cond(split, attributes):
 
     Returns `True` if the split condition is true on the attributes
     """
-    attribute, cutoff = split
-    return attributes[attribute] > cutoff
+    return attributes[split[0]] > split[1]
 
 
 def _evaluate_split_labels(subset, split):
@@ -227,7 +225,7 @@ class ExtraTreeClassifier(object):
                 iterable of attributes. All samples must have the same length.
 
         Returns:
-            Split (idx, cutoff): A split, where `idx` is the attribute index
+            tuple (idx, cutoff): A split, where `idx` is the attribute index
             and `cutoff` the cutoff value `a_c`
         """
         # This looks slow, but seems to be the fastest way using only python.
