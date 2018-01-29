@@ -1,8 +1,8 @@
 import math
 import random
 import unittest
-from src.extratrees import (_entropy, _histogram, _mean, Split,
-                            _evaluate_split, ExtraTree, Node,
+from src.extratrees import (_entropy, _histogram, _mean, 
+                            _evaluate_split, ExtraTreeClassifier, Node,
                             _pick_random_split, ExtraForest)
 
 FOURTHS = ([[0], [1], [1], [1],
