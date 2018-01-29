@@ -64,7 +64,7 @@ if __name__ == '__main__':
     N_POINTS = 20
     TRAIN_SET = load_data(TRAIN_FILE, n_points=60000)
 
-    train_times = [None]*N_POINTS
+    train_times = np.zeros(N_POINTS)
     train_sizes = np.logspace(1, 4.5, N_POINTS)
     for idx, n_train in enumerate(train_sizes):
         train_set = (TRAIN_SET[0][:int(n_train)], TRAIN_SET[1][:int(n_train)])
@@ -73,12 +73,18 @@ if __name__ == '__main__':
 
     plt.xlabel('n')
     plt.ylabel('time [s]')
-    plt.loglog(train_sizes, train_times, label='Algorithm')
+    plt.loglog(train_sizes, train_times/train_times[0], label='Algorithm')
 
     # We want each line to start at train_times[0]
-    plt.loglog(train_sizes, train_sizes, label='n')
-    plt.loglog(train_sizes, (train_sizes**2)/train_times[0], label='n^2')
-    plt.loglog(train_sizes, train_sizes*np.log(train_sizes), label='n*logn')
+    linear_sc = train_sizes/train_sizes[0]
+    quadratic_sc = (train_sizes)**2
+    quadratic_sc = quadratic_sc / quadratic_sc[0]
+    nlogn_sc = train_sizes*np.log(train_sizes)
+    nlogn_sc = nlogn_sc / nlogn_sc[0]
+
+    plt.loglog(train_sizes, linear_sc, label='n')
+    plt.loglog(train_sizes, quadratic_sc, label='n^2')
+    plt.loglog(train_sizes, nlogn_sc, label='n*logn')
     plt.legend()
     plt.grid(True)
     plt.show()
