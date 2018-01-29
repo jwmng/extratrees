@@ -14,8 +14,8 @@ libraries.
 It is now **much** slower than the `sklearn` implementation, and seems to be so
 due to:
 
-    1. `sklearn` uses [pre-sorting][presort] of attributes
-    2. Its really fast Cython optimisations
+1. `sklearn` uses [pre-sorting][presort] of attributes
+2. Its really fast Cython optimisations
 
 ## Installation
 
