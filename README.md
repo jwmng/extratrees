@@ -75,6 +75,9 @@ The _N samples_ column shows how many samples were used for training, these are
 the first `n` of the original training set.
 All 10.000 available test samples are used for testing.
 
+Time complexity in number of trees seems (almost) linear, in number of samples
+it is somehwere between `O(nlogn)` and `O(n^2)`.
+
 To run the benchmarks, get the [MNIST-CSV dataset][pjreddie], and put the files 
 in `docs/mnist/` as `mnist_train.csv` and `mnist_test.csv`.
 They are not included in the repository here as I do not own them.
@@ -82,29 +85,39 @@ They are not included in the repository here as I do not own them.
 
 ### CPython 3.6.3
 
+Single trees:
+
 | N samples | Trees  |  Accuracy | Train [s] | Eval [s] |
 |-----------|--------|-----------|-----------|----------|
-|      1000 |      1 |       .58 |      0.24 |     0.07 |
-|      1000 |     10 |       .80 |      2.10 |     0.06 |
-|      1000 |    100 |       .88 |     21.02 |     5.91 |
-|     10000 |      1 |       .73 |      2.71 |     0.09 |
-|     10000 |     10 |       .91 |     27.00 |     0.81 |
-|     10000 |    100 |       .95 |    279.77 |     8.01 |
-|   All 60k |      1 |       .82 |     20.63 |     0.11 |
-<!-- |   All 60k |     10 |       .95 |    307.73 |     1.07 | -->
+|      1000 |      1 |       .59 |      0.16 |     0.09 |
+|     10000 |      1 |       .72 |      2.01 |     0.09 |
+|     60000 |      1 |       .83 |     15.15 |     0.11 |
+
+Ensembles (without bagging/boosting):
+
+| N samples | Trees  |  Accuracy | Train [s] | Eval [s] |
+|-----------|--------|-----------|-----------|----------|
+|      1000 |     10 |       .79 |      1.49 |     0.62 |
+|     10000 |     10 |       .91 |     20.64 |     0.85 |
+|     60000 |     10 |       .95 |    164.45 |     1.14 |
 
 ### Pypy 3.5.3
 
+Single trees:
+
 | N samples |  Trees |  Accuracy | Train [s] | Eval [s] |
 |-----------|--------|-----------|-----------|----------|
-|      1000 |      1 |       .59 |      0.25 |     0.15 |
-|      1000 |     10 |       .79 |      0.77 |     0.18 |
-|      1000 |    100 |       .88 |      4.47 |     1.49 |
-|     10000 |      1 |       .74 |      0.95 |     0.05 |
-|     10000 |     10 |       .91 |      6.72 |     0.26 |
-|     10000 |    100 |       .95 |      67.7 |     2.45 |
-|   All 60k |      1 |       .83 |      6.44 |     0.09 |
-|   All 60k |     10 |       .95 |     61.80 |     0.37 |
+|      1000 |      1 |       .53 |      0.26 |     0.05 |
+|     10000 |      1 |       .75 |      0.91 |     0.12 |
+|     60000 |      1 |       .82 |      5.75 |     0.08 |
+
+Ensembles (without bagging/boosting):
+
+| N samples | Trees  |  Accuracy | Train [s] | Eval [s] |
+|-----------|--------|-----------|-----------|----------|
+|      1000 |     10 |       .78 |      0.72 |     0.29 |
+|     10000 |     10 |       .90 |      5.67 |     0.27 |
+|     60000 |     10 |       .95 |     50.85 |     0.43 |
 
 
 ### Dataset reference

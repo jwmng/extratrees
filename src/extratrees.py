@@ -29,24 +29,24 @@ def _variance(values):
     return variance(values) if len(values) > 1 else 0.0
 
 
-def _entropy(values, n_classes):
+def _entropy(hist):
     """
     Shannon entropy
 
     This implementation uses log(x,e) instead of log(x,2) because it's around
     30% faster in the python implementation.
     """
-    if not values:
-        return -MAXENTROPY
-
-    hist = _histogram(values, n_classes)
-
-    # This is >10% faster than a list comprehension in most cases
     entropy_sum = 0
     log = math.log
+
+    h_sum = sum(hist)
+    if not h_sum:
+        return MAXENTROPY
+
     for val in hist:
+        freq = val/h_sum
         try:
-            entropy_sum += log(val)*val
+            entropy_sum += log(freq)*freq
         except ValueError:
             continue
 
@@ -62,12 +62,8 @@ def _is_uniform(vals):
     return True
 
 
-def _gini(values, n_classes):
-    """ Gini impurity """
-    if not values:
-        return -MAXENTROPY
-    hist = _histogram(values, n_classes)
-
+def _gini(hist):
+    """ Gini impurity from histogram """
     imp_sum = 0.0
     for val in hist:
         imp_sum += val*(1-val)
@@ -80,14 +76,12 @@ def _histogram(values, n_classes):
     Return the relative frequency of each int between 0 and n_classes
     Will guess `n_classes` if not specified
     """
-    hist = [0.0]*n_classes
+    hist = [0]*n_classes
     if not values:
         return hist
 
-    n_samples = len(values)
-    plusval = (1/n_samples)
     for val in values:
-        hist[val] += plusval
+        hist[val] += 1
 
     return hist
 
@@ -129,8 +123,8 @@ def _evaluate_rec(node, attributes):
 def _pick_random_split(subset, attribute):
     """ Pick an (extremely random) split cutoff for `attribute` """
     attribute_values = [sample[attribute] for sample in subset[0]]
-
     max_a, min_a = max(attribute_values), min(attribute_values)
+
     cut_point = min_a + random.random()*(max_a-min_a)
     return (attribute, cut_point)
 
@@ -143,19 +137,17 @@ def _evaluate_cond(split, attributes):
     return attributes[split[0]] > split[1]
 
 
-def _evaluate_split_labels(subset, split):
-    """ Same as `_evaluate_split`, but only returns labels """
+def _evaluate_oneside(subset, split):
+    """ Same as `_evaluate_split`, returns only labels and the point ratio """
     attributes, outputs = subset
 
-    all_idxs = range(len(outputs))
+    n_idxs = len(outputs)
+    all_idxs = range(n_idxs)
     left = [_evaluate_cond(split, attribute) for attribute in attributes]
-    n_left = sum(left)
-    n_right = len(outputs)-n_left
-
+    left_ratio = sum(left) / n_idxs
     left_outputs = tuple(outputs[idx] for idx in all_idxs if left[idx])
-    right_outputs = tuple(outputs[idx] for idx in all_idxs if not left[idx])
 
-    return n_left, n_right, left_outputs, right_outputs
+    return left_ratio, left_outputs
 
 
 def _evaluate_split(subset, split):
@@ -201,6 +193,7 @@ class ExtraTreeClassifier(object):
         """ Fit a single tree """
         self._init_build(training_set)
         root_node = self._build_extra_tree_rec(training_set)
+
         if not isinstance(root_node, Node):
             raise ValueError("Training failed: Not a single split found")
 
@@ -217,7 +210,7 @@ class ExtraTreeClassifier(object):
         soft_pred = self.predict_proba(samples)
         return [_argmax(hist_) for hist_ in soft_pred]
 
-    def _split_node(self, subset):
+    def _split_node(self, subset, subset_hist):
         """
         Args:
             subset (list): The local learning subset S.
@@ -243,7 +236,7 @@ class ExtraTreeClassifier(object):
         for _ in range(k_value):
             attribute = avail.pop(int(random.random()*(len(avail)-1)))
             split = _pick_random_split(subset, attribute)
-            score = self._score_split(subset, split)
+            score = self._score_split(subset, split, subset_hist)
             if score > best_score:
                 best_score = score
                 best_split = split
@@ -277,19 +270,32 @@ class ExtraTreeClassifier(object):
         """ Create a leaf node (histogram) from available data """
         return _histogram(training_set[1], self.n_classes)
 
-    def _build_extra_tree_rec(self, training_set):
+    def _build_extra_tree_rec(self, training_set, training_set_hist=None):
         """ Recursively build the tree """
-        # Return a leaf if stopping condition is reached
+
+        # Create a label histogram if it is not known
+        if training_set_hist is None:
+            training_set_hist = _histogram(training_set[1], self.n_classes)
+
+        # The leaf for a classifier is the (pre-calculated) histogram
         if self._stop_split(training_set):
-            return self._make_leaf(training_set)
+            return training_set_hist
 
         # Get the optimal split and partition data for child nodes
-        split = self._split_node(training_set)
+        split = self._split_node(training_set, training_set_hist)
         left_data, right_data = _evaluate_split(training_set, split)
 
+        # Infer the new histograms from the old one and left_data
+        hist_right = training_set_hist
+        hist_left = [0]*self.n_classes
+
+        for j in left_data[1]:
+            hist_left[j] += 1
+            hist_right[j] -= 1
+
         # Recursively train children
-        left_node = self._build_extra_tree_rec(left_data)
-        right_node = self._build_extra_tree_rec(right_data)
+        left_node = self._build_extra_tree_rec(left_data, hist_left)
+        right_node = self._build_extra_tree_rec(right_data, hist_right)
 
         return Node(split, left_node, right_node)
 
@@ -322,19 +328,26 @@ class ExtraTreeClassifier(object):
         self.k_value = self.k_value or round(math.sqrt(n_attributes))
         self.n_classes = n_classes
 
-    def _score_split(self, subset, split):
+    def _score_split(self, subset, split, subset_hist):
         """ Calculate information gain of a potential split node """
-        n_left, n_right, left_out, right_out = _evaluate_split_labels(subset,
-                                                                      split)
-        n_total = n_left + n_right
-        ratio_left = (n_left/n_total)
-        criterion = self.criterion
+        left_ratio, left_out = _evaluate_oneside(subset, split)
         n_classes = self.n_classes
 
-        # Classification: Use either gini or shannon as entropy metric
-        ent_subset = criterion(subset[1], n_classes)
-        ent_left = (ratio_left)*criterion(left_out, n_classes)
-        ent_right = (1-ratio_left)*criterion(right_out, n_classes)
+        # We can infer the right histogram from the left one, as the total of
+        # the two should is the histogram of the subset
+        hist_right = list(subset_hist)
+        hist_left = [0]*n_classes
+
+        for j in left_out:
+            hist_left[j] += 1
+            hist_right[j] -= 1
+
+        criterion = self.criterion
+
+        ent_subset = criterion(subset_hist)
+        ent_left = left_ratio*criterion(hist_left)
+        ent_right = (1-left_ratio)*criterion(hist_right)
+
         return ent_subset-ent_left-ent_right
 
 
