@@ -43,17 +43,17 @@ Skip (1) if `X` was supplied as its transpose:
 
 1. Transpose `X`, so that each row contains the attribute values:
     
-    Xt = [
-          [1, 3, 5],
-          [6, 5, 4]
-         ]
+        Xt = [
+              [1, 3, 5],
+              [6, 5, 4]
+             ]
 
 2. Sort the indices of the new matrix by their attribute value:
 
-    Xtn = [
-           [0, 1, 2],
-           [2, 1, 0]
-          ]
+        Xtn = [
+               [0, 1, 2],
+               [2, 1, 0]
+              ]
 
 The matrix `Xtn[j]` now gives *the index of each datapoint, ordered by attribute 
 `j`*.
