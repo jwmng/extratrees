@@ -11,17 +11,11 @@ Mostly, it is an exercise in optimization and an experiment as to how to
 get some performance in python without using numpy or other third-party compiled
 libraries.
 
-Some useful notes:
+It is now **much** slower than the `sklearn` implementation, and seems to be so
+due to:
 
-- To get the most common values or relative frequencies, loops are faster than
-  `collections.Counter`
-- `math.log(x)` is about 30% faster than `math.log(x,2)`
-- Vector multiplication using lists (`sum([a*b for a,b in c])`) is faster when
-  eliminating zeros (if they occur) first (`sum([a*b for a,b in c if b])`)
-- There is sill some room for optimization in the script, but the benchmarks 
-  show **it is about 50x slower** than the implementation `sklearn.ensemble`. 
-  Main reasons seem to be that 1) numpy and sklearn are Cython-optimized 2)
-  thanks to sklearn's presort/sparse optimizations.
+    1. `sklearn` uses [pre-sorting][presort] of attributes
+    2. Its really fast Cython optimisations
 
 ## Installation
 
@@ -129,3 +123,4 @@ in [LeCun et al (1998)][lecun1998].
 [geurts2005]: http://orbi.ulg.ac.be/bitstream/2268/9357/1/geurts-mlj-advance.pdf
 [pjreddie]: https://pjreddie.com/projects/mnist-in-csv/
 [sklearn]: http://scikit-learn.org/stable/modules/classes.html#module-sklearn.datasets
+[presort]: ./docs/presort.md
