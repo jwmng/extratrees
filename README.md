@@ -4,18 +4,23 @@ This is a Python implementation of the Extremely Randomized Trees (ExtraTrees)
 technique as proposed in the article
 [Geurts, Ernst & Wehenkel (2005)][geurts2005].
 
-## Goal
+## Goal / progress
 
 This does not aim to be anywhere near a production-ready library.
-Mostly, it is an exercise in optimization and an experiment as to how to
-get some performance in python without using numpy or other third-party compiled
-libraries.
+Mostly, it is a study in optimization and an experiment as to how to
+get the most performance in python without using numpy or other third-party 
+compiled libraries.
 
-It is now **much** slower than the `sklearn` implementation, and seems to be so
-due to:
+It is now **much** slower than the `sklearn` implementation, possible due to
+three big differences:
 
 1. `sklearn` uses [pre-sorting][presort] of attributes
 2. Its really fast Cython optimisations
+3. Numpy can do fast operations on rows as well as columns, whereas do the
+   nature of python lists, only one of those is fast 
+
+Presorting in without using numpy/Cyton does not seem to improve the result 
+here much.
 
 ## Installation
 
@@ -72,6 +77,9 @@ All 10.000 available test samples are used for testing.
 Time complexity in number of trees seems (almost) linear, in number of samples
 it is somehwere between `O(nlogn)` and `O(n^2)`.
 
+Ensemble train times may be a bit out of date, I don't check them very
+regularly.
+
 To run the benchmarks, get the [MNIST-CSV dataset][pjreddie], and put the files 
 in `docs/mnist/` as `mnist_train.csv` and `mnist_test.csv`.
 They are not included in the repository here as I do not own them.
@@ -83,9 +91,9 @@ Single trees:
 
 | N samples | Trees  |  Accuracy | Train [s] | Eval [s] |
 |-----------|--------|-----------|-----------|----------|
-|      1000 |      1 |       .59 |      0.16 |     0.09 |
-|     10000 |      1 |       .72 |      2.01 |     0.09 |
-|     60000 |      1 |       .83 |     15.15 |     0.11 |
+|      1000 |      1 |       .59 |      0.13 |     0.09 |
+|     10000 |      1 |       .72 |      1.49 |     0.09 |
+|     60000 |      1 |       .83 |     11.22 |     0.11 |
 
 Ensembles (without bagging/boosting):
 
@@ -101,9 +109,9 @@ Single trees:
 
 | N samples |  Trees |  Accuracy | Train [s] | Eval [s] |
 |-----------|--------|-----------|-----------|----------|
-|      1000 |      1 |       .53 |      0.26 |     0.05 |
-|     10000 |      1 |       .75 |      0.91 |     0.12 |
-|     60000 |      1 |       .82 |      5.75 |     0.08 |
+|      1000 |      1 |       .53 |      0.20 |     0.05 |
+|     10000 |      1 |       .75 |      0.77 |     0.12 |
+|     60000 |      1 |       .82 |      4.43 |     0.08 |
 
 Ensembles (without bagging/boosting):
 
