@@ -65,8 +65,13 @@ def _is_uniform(vals):
 def _gini(hist):
     """ Gini impurity from histogram """
     imp_sum = 0.0
+    h_sum = sum(hist)
+    if not h_sum:
+        return MAXENTROPY
+
     for val in hist:
-        imp_sum += val*(1-val)
+        freq = val/h_sum
+        imp_sum += freq*(1-freq)
 
     return imp_sum
 
@@ -109,8 +114,8 @@ def _argmax(values):
 
 def _evaluate_rec(node, attributes):
     """ Recursively traverse a node with `attributes` until a leaf is found"""
-    # This is slightly faster than `isinstance`, since all should have a
-    # `split` field, while histograms do not
+
+    # This is slightly faster than calling `isinstance` and more EAFP
     try:
         node.split
     except AttributeError:
@@ -120,10 +125,9 @@ def _evaluate_rec(node, attributes):
     return _evaluate_rec(next_, attributes)
 
 
-def _pick_random_split(subset, attribute):
+def _pick_random_split(vals, attribute):
     """ Pick an (extremely random) split cutoff for `attribute` """
-    attribute_values = [sample[attribute] for sample in subset[0]]
-    max_a, min_a = max(attribute_values), min(attribute_values)
+    max_a, min_a = max(vals), min(vals)
 
     cut_point = min_a + random.random()*(max_a-min_a)
     return (attribute, cut_point)
@@ -140,14 +144,11 @@ def _evaluate_cond(split, attributes):
 def _evaluate_oneside(subset, split):
     """ Same as `_evaluate_split`, returns only labels and the point ratio """
     attributes, outputs = subset
+    attr_idx, attr_thresh = split
+    left_outputs = (output for idx, output in enumerate(outputs) if
+                    attributes[idx][attr_idx] > attr_thresh)
 
-    n_idxs = len(outputs)
-    all_idxs = range(n_idxs)
-    left = [_evaluate_cond(split, attribute) for attribute in attributes]
-    left_ratio = sum(left) / n_idxs
-    left_outputs = tuple(outputs[idx] for idx in all_idxs if left[idx])
-
-    return left_ratio, left_outputs
+    return left_outputs
 
 
 def _evaluate_split(subset, split):
@@ -233,9 +234,11 @@ class ExtraTreeClassifier(object):
 
         # For each `k_value` iterations, take a (new) random attribute from
         # `available` and use it to build a split
+        # See if this is faster
         for _ in range(k_value):
             attribute = avail.pop(int(random.random()*(len(avail)-1)))
-            split = _pick_random_split(subset, attribute)
+            vals = [sample[attribute] for sample in subset[0]]
+            split = _pick_random_split(vals, attribute)
             score = self._score_split(subset, split, subset_hist)
             if score > best_score:
                 best_score = score
@@ -330,7 +333,7 @@ class ExtraTreeClassifier(object):
 
     def _score_split(self, subset, split, subset_hist):
         """ Calculate information gain of a potential split node """
-        left_ratio, left_out = _evaluate_oneside(subset, split)
+        left_out = _evaluate_oneside(subset, split)
         n_classes = self.n_classes
 
         # We can infer the right histogram from the left one, as the total of
@@ -338,9 +341,13 @@ class ExtraTreeClassifier(object):
         hist_right = list(subset_hist)
         hist_left = [0]*n_classes
 
+        left_count = 0
         for j in left_out:
             hist_left[j] += 1
             hist_right[j] -= 1
+            left_count += 1
+
+        left_ratio = left_count / len(subset[1])
 
         criterion = self.criterion
 
