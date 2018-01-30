@@ -16,11 +16,11 @@ three big differences:
 
 1. `sklearn` uses [pre-sorting][presort] of attributes
 2. Its really fast Cython optimisations
-3. Numpy can do fast operations on rows as well as columns, whereas do the
-   nature of python lists, only one of those is fast 
+3. Numpy can do fast operations on rows as well as columns, whereas due to the
+   nature of python lists, only one 'axis' is fast to operate on.
 
-Presorting in without using numpy/Cyton does not seem to improve the result 
-here much.
+Presorting in without using numpy or Cyton does not seem to improve the result 
+here much, since the required transposes are _really_ slow.
 
 ## Installation
 
