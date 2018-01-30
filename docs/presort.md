@@ -91,9 +91,16 @@ strategy:
         if X[idx] >= threshold:
             break
 
-    return xnew_hat[:idx], xnew_hat[idx:]
+    return Xtn[:idx], Xtn[idx:]
 
 This is guaranteed to complete, and runs in linear time.
 
 
 [SO-presort]: https://stackoverflow.com/questions/37754380/does-presorting-slow-down-training-of-large-decision-trees
+
+## Notes
+
+- At 10k datapoints and 780 attributes, transposing (using `zip`) and sorting 
+  using `sorted` combined takes around one second (around 55% of original
+  training time)
+
