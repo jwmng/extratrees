@@ -128,6 +128,8 @@ def _evaluate_rec(node, attributes):
 def _pick_random_split(vals, attribute):
     """ Pick an (extremely random) split cutoff for `attribute` """
     max_a, min_a = max(vals), min(vals)
+    if max_a == min_a:
+        return None
 
     cut_point = min_a + random.random()*(max_a-min_a)
     return (attribute, cut_point)
@@ -161,11 +163,13 @@ def _evaluate_split(subset, split):
     # In theory, this is faster than checking if `idx` is in `left_indices`,
     # since the latter requires enumerating `left_indices` every time.
     attributes, outputs = subset
-    all_idxs = (range(len(attributes)))
-    left = [_evaluate_cond(split, attribute) for attribute in attributes]
+    attr_idx, attr_thresh = split
 
-    left_indices = [idx for idx in all_idxs if left[idx]]
-    right_indices = [idx for idx in all_idxs if not left[idx]]
+    left = [attributes[idx][attr_idx] > attr_thresh
+            for idx, _ in enumerate(outputs)]
+
+    left_indices = [idx for idx, val in enumerate(left) if val]
+    right_indices = [idx for idx, val in enumerate(left) if not val]
 
     left_attributes = tuple(attributes[idx] for idx in left_indices)
     right_attributes = tuple(attributes[idx] for idx in right_indices)
@@ -211,7 +215,7 @@ class ExtraTreeClassifier(object):
         soft_pred = self.predict_proba(samples)
         return [_argmax(hist_) for hist_ in soft_pred]
 
-    def _split_node(self, subset, subset_hist):
+    def _split_node(self, subset, subset_hist, subset_ent):
         """
         Args:
             subset (list): The local learning subset S.
@@ -238,13 +242,20 @@ class ExtraTreeClassifier(object):
         for _ in range(k_value):
             attribute = avail.pop(int(random.random()*(len(avail)-1)))
             vals = [sample[attribute] for sample in subset[0]]
+
+            if _is_uniform(vals):
+                continue
+
             split = _pick_random_split(vals, attribute)
-            score = self._score_split(subset, split, subset_hist)
+
+            score, *ents = self._score_split(subset, split, subset_hist,
+                                             subset_ent)
             if score > best_score:
                 best_score = score
                 best_split = split
+                best_ents = ents
 
-        return best_split
+        return best_split, best_ents[0], best_ents[1]
 
     def _stop_split(self, subset):
         """
@@ -273,20 +284,28 @@ class ExtraTreeClassifier(object):
         """ Create a leaf node (histogram) from available data """
         return _histogram(training_set[1], self.n_classes)
 
-    def _build_extra_tree_rec(self, training_set, training_set_hist=None):
+    def _build_extra_tree_rec(self, training_set, training_set_hist=None,
+                              training_set_ent=None):
         """ Recursively build the tree """
 
         # Create a label histogram if it is not known
         if training_set_hist is None:
             training_set_hist = _histogram(training_set[1], self.n_classes)
 
+        # Same for entropy
+        if training_set_ent is None:
+            training_set_ent = self.criterion(training_set_hist)
+
         # The leaf for a classifier is the (pre-calculated) histogram
         if self._stop_split(training_set):
             return training_set_hist
 
         # Get the optimal split and partition data for child nodes
-        split = self._split_node(training_set, training_set_hist)
-        left_data, right_data = _evaluate_split(training_set, split)
+        split, left_ent, right_ent = self._split_node(training_set,
+                                                      training_set_hist,
+                                                      training_set_ent)
+
+        (left_data, right_data) = _evaluate_split(training_set, split)
 
         # Infer the new histograms from the old one and left_data
         hist_right = training_set_hist
@@ -297,8 +316,10 @@ class ExtraTreeClassifier(object):
             hist_right[j] -= 1
 
         # Recursively train children
-        left_node = self._build_extra_tree_rec(left_data, hist_left)
-        right_node = self._build_extra_tree_rec(right_data, hist_right)
+        left_node = self._build_extra_tree_rec(left_data, hist_left,
+                                               left_ent)
+        right_node = self._build_extra_tree_rec(right_data, hist_right,
+                                                right_ent)
 
         return Node(split, left_node, right_node)
 
@@ -331,7 +352,7 @@ class ExtraTreeClassifier(object):
         self.k_value = self.k_value or round(math.sqrt(n_attributes))
         self.n_classes = n_classes
 
-    def _score_split(self, subset, split, subset_hist):
+    def _score_split(self, subset, split, subset_hist, subset_ent):
         """ Calculate information gain of a potential split node """
         left_out = _evaluate_oneside(subset, split)
         n_classes = self.n_classes
@@ -349,13 +370,20 @@ class ExtraTreeClassifier(object):
 
         left_ratio = left_count / len(subset[1])
 
+        # If all datapoints are assigned to one side, discard this candidate
+        if not left_ratio:
+            return -MAXENTROPY, None, None
+
         criterion = self.criterion
 
-        ent_subset = criterion(subset_hist)
-        ent_left = left_ratio*criterion(hist_left)
-        ent_right = (1-left_ratio)*criterion(hist_right)
+        left_ent = criterion(hist_left)
+        right_ent = criterion(hist_right)
 
-        return ent_subset-ent_left-ent_right
+        information_gain = (subset_ent
+                            - left_ratio*left_ent
+                            - (1-left_ratio)*right_ent)
+
+        return information_gain, left_ent, right_ent
 
 
 class ExtraTreeRegressor(ExtraTreeClassifier):

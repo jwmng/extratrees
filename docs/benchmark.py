@@ -95,6 +95,5 @@ if __name__ == '__main__':
     TRAIN_SET = load_data(TRAIN_FILE, n_points=N_TRAINING)
 
     print("Loading test data")
-    TEST_SET = load_data(TEST_FILE)
+    TEST_SET = load_data(TEST_FILE, n_points=1000)
     bench(TRAIN_SET, TEST_SET, N_TREES)
-    # profile.run('bench(TRAIN_SET, TEST_SET, N_TREES)', sort=1)
