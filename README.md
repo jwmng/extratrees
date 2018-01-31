@@ -84,9 +84,6 @@ All 10.000 available test samples are used for testing.
 Time complexity in number of trees seems (almost) linear, in number of samples
 it is somehwere between `O(nlogn)` and `O(n^2)`.
 
-Ensemble train times may be a bit out of date, I don't check them very
-regularly.
-
 To run the benchmarks, get the [MNIST-CSV dataset][pjreddie], and put the files 
 in `docs/mnist/` as `mnist_train.csv` and `mnist_test.csv`.
 They are not included in the repository here as I do not own them.
@@ -94,21 +91,13 @@ They are not included in the repository here as I do not own them.
 
 ### CPython 3.6.3
 
-Single trees:
 
 | N samples | Trees  |  Accuracy | Train [s] | Eval [s] |
 |-----------|--------|-----------|-----------|----------|
-|      1000 |      1 |       .59 |      0.13 |     0.09 |
-|     10000 |      1 |       .72 |      1.49 |     0.09 |
-|     60000 |      1 |       .83 |     11.22 |     0.11 |
+|      1000 |      1 |       .59 |      0.08 |     0.09 |
+|     10000 |      1 |       .74 |      1.02 |     0.09 |
+|     60000 |      1 |       .83 |      8.20 |     0.11 |
 
-Ensembles (without bagging/boosting):
-
-| N samples | Trees  |  Accuracy | Train [s] | Eval [s] |
-|-----------|--------|-----------|-----------|----------|
-|      1000 |     10 |       .79 |      1.49 |     0.62 |
-|     10000 |     10 |       .91 |     20.64 |     0.85 |
-|     60000 |     10 |       .95 |    164.45 |     1.14 |
 
 ### Pypy 3.5.3
 
@@ -116,17 +105,9 @@ Single trees:
 
 | N samples |  Trees |  Accuracy | Train [s] | Eval [s] |
 |-----------|--------|-----------|-----------|----------|
-|      1000 |      1 |       .53 |      0.20 |     0.05 |
-|     10000 |      1 |       .75 |      0.77 |     0.12 |
-|     60000 |      1 |       .82 |      4.43 |     0.08 |
-
-Ensembles (without bagging/boosting):
-
-| N samples | Trees  |  Accuracy | Train [s] | Eval [s] |
-|-----------|--------|-----------|-----------|----------|
-|      1000 |     10 |       .78 |      0.72 |     0.29 |
-|     10000 |     10 |       .90 |      5.67 |     0.27 |
-|     60000 |     10 |       .95 |     50.85 |     0.43 |
+|      1000 |      1 |       .53 |      0.19 |     0.05 |
+|     10000 |      1 |       .75 |      0.63 |     0.12 |
+|     60000 |      1 |       .81 |      3.45 |     0.08 |
 
 
 ### Dataset reference
