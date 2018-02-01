@@ -235,6 +235,7 @@ class ExtraTreeClassifier(object):
 
         best_score = -MAXENTROPY
         best_split = None
+        best_ents = (None, None)
 
         # For each `k_value` iterations, take a (new) random attribute from
         # `available` and use it to build a split
@@ -254,6 +255,10 @@ class ExtraTreeClassifier(object):
                 best_score = score
                 best_split = split
                 best_ents = ents
+
+        # No informative split found, just return the last one
+        if best_split is None:
+            return None, None, None
 
         return best_split, best_ents[0], best_ents[1]
 
@@ -304,6 +309,9 @@ class ExtraTreeClassifier(object):
         split, left_ent, right_ent = self._split_node(training_set,
                                                       training_set_hist,
                                                       training_set_ent)
+
+        if split is None:
+            return training_set_hist
 
         (left_data, right_data) = _evaluate_split(training_set, split)
 

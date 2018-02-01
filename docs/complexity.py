@@ -57,7 +57,7 @@ def get_train_time(train_data):
 
     t_start = time.time()
     forest.fit(train_data)
-    t_train = time.time() - t_start
+    t_train = (time.time() - t_start) / 10
     return t_train
 
 if __name__ == '__main__':
@@ -73,18 +73,7 @@ if __name__ == '__main__':
 
     plt.xlabel('n')
     plt.ylabel('time [s]')
-    plt.loglog(train_sizes, train_times/train_times[0], label='Algorithm')
-
-    # We want each line to start at train_times[0]
-    linear_sc = train_sizes/train_sizes[0]
-    quadratic_sc = (train_sizes)**2
-    quadratic_sc = quadratic_sc / quadratic_sc[0]
-    nlogn_sc = train_sizes*np.log(train_sizes)
-    nlogn_sc = nlogn_sc / nlogn_sc[0]
-
-    plt.loglog(train_sizes, linear_sc, label='n')
-    plt.loglog(train_sizes, quadratic_sc, label='n^2')
-    plt.loglog(train_sizes, nlogn_sc, label='n*logn')
-    plt.legend()
+    plt.loglog(train_sizes, train_times/train_times[0], label='Time')
     plt.grid(True)
+    plt.legend()
     plt.show()
