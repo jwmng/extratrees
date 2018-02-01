@@ -15,26 +15,35 @@ import random
 from collections import namedtuple
 from statistics import variance
 
-
-TIMES = {}
-TIME0 = 0
 MAXENTROPY = 1e10
 
 Node = namedtuple('Node', ['split', 'left', 'right'])
 
 
 def _variance(values):
+    """ Return variance of a list of values """
     if not values:
-        return -MAXENTROPY
+        return MAXENTROPY
     return variance(values) if len(values) > 1 else 0.0
 
 
-def _entropy(hist):
-    """
-    Shannon entropy
+def _is_uniform(vals):
+    """ Returns true if all elements in `vals` are the same """
+    try:
+        first = vals[0]
+    except IndexError:
+        return True
 
-    This implementation uses log(x,e) instead of log(x,2) because it's around
-    30% faster in the python implementation.
+    for other in vals[1:]:
+        if first != other:
+            return False
+    return True
+
+
+def _entropy(hist):
+    """ Shannon entropy from histogram
+    
+    Uses `log(x)` instead of `log(x,2)` since it is faster.
     """
     entropy_sum = 0
     log = math.log
@@ -53,15 +62,6 @@ def _entropy(hist):
     return -entropy_sum
 
 
-def _is_uniform(vals):
-    """ Returns true if all elements in `vals` are the same """
-    first = vals[0]
-    for other in vals[1:]:
-        if first != other:
-            return False
-    return True
-
-
 def _gini(hist):
     """ Gini impurity from histogram """
     imp_sum = 0.0
@@ -77,10 +77,7 @@ def _gini(hist):
 
 
 def _histogram(values, n_classes):
-    """
-    Return the relative frequency of each int between 0 and n_classes
-    Will guess `n_classes` if not specified
-    """
+    """ Return the frequency of each int between 0 and n_classes """
     hist = [0]*n_classes
     if not values:
         return hist
@@ -108,7 +105,7 @@ def _majority(values):
 
 
 def _argmax(values):
-    """ Return the index of the largest value in `values` """
+    """ Return the smallest index of the largest value in `values` """
     return values.index(max(values))
 
 
@@ -121,26 +118,10 @@ def _evaluate_rec(node, attributes):
     except AttributeError:
         return node
 
-    next_ = node.left if _evaluate_cond(node.split, attributes) else node.right
+    next_ = (node.left if attributes[node.split[0]] > node.split[1]
+             else node.right)
+
     return _evaluate_rec(next_, attributes)
-
-
-def _pick_random_split(vals, attribute):
-    """ Pick an (extremely random) split cutoff for `attribute` """
-    max_a, min_a = max(vals), min(vals)
-    if max_a == min_a:
-        return None
-
-    cut_point = min_a + random.random()*(max_a-min_a)
-    return (attribute, cut_point)
-
-
-def _evaluate_cond(split, attributes):
-    """ Evaluate the split condition on `attributes`
-
-    Returns `True` if the split condition is true on the attributes
-    """
-    return attributes[split[0]] > split[1]
 
 
 def _evaluate_oneside(subset, split):
@@ -178,6 +159,14 @@ def _evaluate_split(subset, split):
     right_outputs = tuple(outputs[idx] for idx in right_indices)
 
     return ((left_attributes, left_outputs), (right_attributes, right_outputs))
+
+
+def _pick_random_split(vals, attribute):
+    """ Pick an (extremely random) split cutoff for `attribute` """
+    max_a, min_a = max(vals), min(vals)
+
+    cut_point = min_a + random.random()*(max_a-min_a)
+    return (attribute, cut_point)
 
 
 class ExtraTreeClassifier(object):
@@ -248,6 +237,8 @@ class ExtraTreeClassifier(object):
                 continue
 
             split = _pick_random_split(vals, attribute)
+            if split is None:
+                continue
 
             score, *ents = self._score_split(subset, split, subset_hist,
                                              subset_ent)
@@ -285,9 +276,9 @@ class ExtraTreeClassifier(object):
 
         return False
 
-    def _make_leaf(self, training_set):
+    def _make_leaf(self, _, hist=None):
         """ Create a leaf node (histogram) from available data """
-        return _histogram(training_set[1], self.n_classes)
+        return hist
 
     def _build_extra_tree_rec(self, training_set, training_set_hist=None,
                               training_set_ent=None):
@@ -303,7 +294,7 @@ class ExtraTreeClassifier(object):
 
         # The leaf for a classifier is the (pre-calculated) histogram
         if self._stop_split(training_set):
-            return training_set_hist
+            return self._make_leaf(training_set, training_set_hist)
 
         # Get the optimal split and partition data for child nodes
         split, left_ent, right_ent = self._split_node(training_set,
@@ -331,7 +322,7 @@ class ExtraTreeClassifier(object):
 
         return Node(split, left_node, right_node)
 
-    def __output_check(self, outputs):
+    def _output_check(self, outputs):
         # All classes are always integers (this works for booleans too)
         assert all(isinstance(output, int) for output in outputs), (
             "All class labels should be int or bool")
@@ -348,7 +339,7 @@ class ExtraTreeClassifier(object):
         n_attributes = len(attributes[0])
         n_classes = max(outputs) + 1
 
-        self.__output_check(outputs)
+        self._output_check(outputs)
 
         # Since n_classes is the maximum of outputs, we only need to check if
         # they are strictly positive
@@ -414,7 +405,7 @@ class ExtraTreeRegressor(ExtraTreeClassifier):
         """ Create a leaf node from available data """
         return _mean(training_set[1])
 
-    def __output_check(self, outputs):
+    def _output_check(self, outputs):
         assert all(isinstance(output, (float, int)) for output in outputs), (
             "All class labels should be floats or ints")
 
